@@ -6,3 +6,4 @@ pandas
 streamlit
 beautifulsoup4
 chromedriver-autoinstaller
+chrome-version
