@@ -1,22 +1,16 @@
 import streamlit as st
 import pandas as pd
-import chromedriver_autoinstaller
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import re
 import concurrent.futures
 import time
 
-# Configure the Streamlit page
 st.set_page_config(page_title="Keyword Search", layout="wide", initial_sidebar_state="collapsed")
 
-# Function to scrape content from a URL using Selenium
 def scrape_content(url):
-    # Automatically install chromedriver
-    chromedriver_autoinstaller.install()
-
-    # Set up Selenium Chrome options
     chrome_options = Options()
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--disable-gpu')
@@ -24,26 +18,25 @@ def scrape_content(url):
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36')
 
-    # Create the WebDriver instance
-    driver = webdriver.Chrome(options=chrome_options)
+    service = Service('chromedriver.exe') 
+    driver = webdriver.Chrome(service=service, options=chrome_options)
 
     try:
         driver.get(url)
-        time.sleep(1)  # Wait for the page to load
+        time.sleep(1)  
 
-        # Parse the page content with BeautifulSoup
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         for element in soup.select('header, footer, nav, aside'):
             element.extract()
 
         main_content = soup.find('main') or soup.find('article') or soup.find('div', {'class': 'main-content'})
         if not main_content:
-            main_content = soup.body
+            main_content = soup.body 
 
         text_content = main_content.get_text(separator=' ')
         text_content = re.sub(r'<[^>]+>', '', text_content)
         text_content = re.sub(r'&\w+;', '', text_content)
-
+        
         return text_content.lower()
     except Exception as e:
         st.error(f"Error scraping {url}: {e}")
@@ -51,28 +44,24 @@ def scrape_content(url):
     finally:
         driver.quit()
 
-# Function to search for a keyword in the content
 def search_keyword_in_content(content, keyword):
     if content:
         return keyword.lower() in content
     return False
 
-# Streamlit app layout
 st.title("Keyword Search in URL Content")
 uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
 user_keyword = st.text_input("Enter keyword to search")
 
 if uploaded_file and user_keyword:
     try:
-        # Load the uploaded CSV/Excel file
         if uploaded_file.name.endswith('.csv'):
             df = pd.read_csv(uploaded_file)
         else:
             df = pd.read_excel(uploaded_file)
 
-        # Display the entire CSV file
-        st.write("Uploaded Data:")
-        st.write(df)
+        st.write("Data Preview:")
+        st.write(df.head())
 
         if 'source_url' in df.columns:
             start_time = time.time()
@@ -94,7 +83,6 @@ if uploaded_file and user_keyword:
                 st.write("Matching URLs:")
                 st.write(results_df)
 
-                # Provide download option for results
                 csv = results_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="Download results as CSV",
