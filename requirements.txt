@@ -1,3 +1,7 @@
 openpyxl
 scrapy
-
+futures
+selenium
+pandas
+streamlit
+BeautifulSoup
