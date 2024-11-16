@@ -4,4 +4,4 @@ futures
 selenium
 pandas
 streamlit
-BeautifulSoup
+beautifulsoup4
