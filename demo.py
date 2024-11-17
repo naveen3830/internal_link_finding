@@ -68,7 +68,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.set_page_config(page_title="Keyword Search", layout="wide", initial_sidebar_state="collapsed")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
