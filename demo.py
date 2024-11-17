@@ -4,31 +4,37 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import re
 import concurrent.futures
 import time
+import logging
 
 st.set_page_config(page_title="Keyword Search", layout="wide", initial_sidebar_state="collapsed")
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 def get_chrome_driver():
     chrome_options = Options()
-    chrome_options.add_argument('--headless=new')  # Updated headless mode syntax
+    chrome_options.add_argument('--headless=new')
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-extensions')
     chrome_options.add_argument('--disable-infobars')
     chrome_options.add_argument('--remote-debugging-port=9222')
+    chrome_options.add_argument('--window-size=1920,1080')  # Set a consistent window size
     chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
     try:
-        # First try using the default webdriver manager
         driver = webdriver.Chrome(options=chrome_options)
         return driver
     except Exception as e1:
         try:
-            # Try Debian-specific ChromeDriver locations
             debian_paths = [
                 '/usr/bin/chromedriver',
                 '/usr/lib/chromium/chromedriver',
@@ -50,8 +56,40 @@ def get_chrome_driver():
             st.error(f"Failed to initialize Chrome driver: {str(e1)}\n{str(e2)}")
             return None
 
+def wait_for_page_load(driver, timeout=10):
+    try:
+        # Wait for the body element to be present
+        WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+        
+        # Add a small delay to ensure dynamic content loads
+        time.sleep(3)
+        
+        # Check if page has finished loading
+        return driver.execute_script("return document.readyState") == "complete"
+    except Exception as e:
+        logger.error(f"Error waiting for page load: {str(e)}")
+        return False
+
+def clean_text(text):
+    """Clean and normalize text content"""
+    if not text:
+        return ""
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text)
+    # Remove HTML tags
+    text = re.sub(r'<[^>]+>', '', text)
+    # Remove special characters
+    text = re.sub(r'&\w+;', '', text)
+    # Remove non-printable characters
+    text = ''.join(char for char in text if char.isprintable())
+    return text.strip().lower()
+
 def process_url(url, user_keyword):
     if not url or not isinstance(url, str):
+        logger.warning(f"Invalid URL: {url}")
         return None, None
         
     driver = get_chrome_driver()
@@ -59,34 +97,57 @@ def process_url(url, user_keyword):
         return None, None
     
     try:
-        driver.get(url)
-        time.sleep(2)
+        # Set page load timeout
+        driver.set_page_load_timeout(30)
         
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        # Load the page
+        driver.get(url)
+        
+        # Wait for page to load completely
+        if not wait_for_page_load(driver):
+            logger.warning(f"Page load timeout for URL: {url}")
+            return url, False
+        
+        # Get page source after JavaScript execution
+        page_source = driver.page_source
+        soup = BeautifulSoup(page_source, 'html.parser')
         
         # Remove unwanted elements
-        for element in soup.select('header, footer, nav, aside, script, style'):
+        for element in soup.select('header, footer, nav, aside, script, style, iframe, noscript'):
             element.extract()
             
-        # Find main content
-        main_content = soup.find('main') or soup.find('article') or soup.find('div', {'class': 'main-content'})
-        if not main_content:
-            main_content = soup.body
+        # Try different content areas
+        content_areas = [
+            soup.find('main'),
+            soup.find('article'),
+            soup.find('div', {'class': ['main-content', 'content', 'post-content']}),
+            soup.find('div', {'id': ['main-content', 'content', 'post-content']}),
+            soup.body
+        ]
+        
+        # Use the first non-None content area
+        main_content = next((area for area in content_areas if area is not None), None)
             
         if main_content:
+            # Get text content
             text_content = main_content.get_text(separator=' ')
-            text_content = re.sub(r'\s+', ' ', text_content)
-            text_content = re.sub(r'<[^>]+>', '', text_content)
-            text_content = re.sub(r'&\w+;', '', text_content)
-            text_content = text_content.strip().lower()
+            # Clean and normalize text
+            text_content = clean_text(text_content)
             
-            if user_keyword.lower() in text_content:
-                return url, True
+            # Log content length for debugging
+            logger.info(f"Content length for {url}: {len(text_content)} characters")
             
+            # Search for keyword
+            keyword_found = user_keyword.lower() in text_content
+            logger.info(f"Keyword search result for {url}: {keyword_found}")
+            
+            return url, keyword_found
+            
+        logger.warning(f"No main content found for URL: {url}")
         return url, False
         
     except Exception as e:
-        st.error(f"Error scraping {url}: {str(e)}")
+        logger.error(f"Error scraping {url}: {str(e)}")
         return url, False
     finally:
         try:
@@ -96,6 +157,10 @@ def process_url(url, user_keyword):
 
 def main():
     st.title("Keyword Search in URL Content")
+    
+    # Add a cache clear button
+    if st.button("Clear Cache"):
+        st.cache_data.clear()
     
     col1, col2 = st.columns([3, 1])
     
@@ -122,7 +187,7 @@ def main():
                 
             # Clean and validate URLs
             df['source_url'] = df['source_url'].astype(str).str.strip()
-            valid_urls = df['source_url'].str.startswith(('http://', 'https://')).fillna(False)
+            valid_urls = df['source_url'].str.match(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
             df = df[valid_urls].copy()
             
             if df.empty:
@@ -136,11 +201,11 @@ def main():
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
-                # Process URLs in parallel with progress tracking
                 total_urls = len(df)
                 completed = 0
                 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                # Reduce number of workers to ensure stability
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                     future_to_url = {
                         executor.submit(process_url, url, user_keyword): url 
                         for url in df['source_url']
@@ -157,7 +222,7 @@ def main():
                             if found:
                                 matching_urls.append(url)
                         except Exception as e:
-                            st.error(f"Error processing URL: {str(e)}")
+                            logger.error(f"Error processing URL: {str(e)}")
             
             end_time = time.time()
             elapsed_time = end_time - start_time
@@ -182,6 +247,7 @@ def main():
                 st.info("No matching URLs found.")
                 
         except Exception as e:
+            logger.error(f"An error occurred: {str(e)}")
             st.error(f"An error occurred: {str(e)}")
             st.exception(e)
 
