@@ -13,54 +13,55 @@ st.set_page_config(page_title="Keyword Search", layout="wide", initial_sidebar_s
 
 def get_chrome_driver():
     chrome_options = Options()
-    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--headless=new')  # Updated headless mode syntax
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36')
+    chrome_options.add_argument('--disable-extensions')
+    chrome_options.add_argument('--disable-infobars')
+    chrome_options.add_argument('--remote-debugging-port=9222')
+    chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
     try:
-        # Try using the default ChromeDriver location
+        # First try using the default webdriver manager
         driver = webdriver.Chrome(options=chrome_options)
-    except:
+        return driver
+    except Exception as e1:
         try:
-            # Try alternative ChromeDriver locations
-            driver_paths = [
-                '/usr/lib/chromium-browser/chromedriver',
+            # Try Debian-specific ChromeDriver locations
+            debian_paths = [
                 '/usr/bin/chromedriver',
-                'chromedriver'
+                '/usr/lib/chromium/chromedriver',
+                '/snap/bin/chromium.chromedriver'
             ]
             
-            for path in driver_paths:
+            for path in debian_paths:
                 try:
-                    service = Service(path)
+                    service = Service(executable_path=path)
                     driver = webdriver.Chrome(service=service, options=chrome_options)
                     return driver
-                except:
+                except Exception:
                     continue
             
-            st.error("Could not initialize ChromeDriver. Please check if chromium-browser and chromium-driver are installed.")
+            st.error("Could not find ChromeDriver. Please check if chromium and chromium-driver are installed.")
             return None
             
-        except Exception as e:
-            st.error(f"Failed to initialize Chrome driver: {e}")
+        except Exception as e2:
+            st.error(f"Failed to initialize Chrome driver: {str(e1)}\n{str(e2)}")
             return None
-    
-    return driver
 
-def scrape_content(url):
+def process_url(url, user_keyword):
     if not url or not isinstance(url, str):
-        return None
+        return None, None
         
     driver = get_chrome_driver()
     if not driver:
-        return None
+        return None, None
     
     try:
         driver.get(url)
-        time.sleep(2)  # Increased wait time for better page loading
+        time.sleep(2)
         
-        # Wait for body to be present
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         
         # Remove unwanted elements
@@ -74,31 +75,35 @@ def scrape_content(url):
             
         if main_content:
             text_content = main_content.get_text(separator=' ')
-            text_content = re.sub(r'\s+', ' ', text_content)  # Normalize whitespace
+            text_content = re.sub(r'\s+', ' ', text_content)
             text_content = re.sub(r'<[^>]+>', '', text_content)
             text_content = re.sub(r'&\w+;', '', text_content)
-            return text_content.strip().lower()
-        return None
+            text_content = text_content.strip().lower()
+            
+            if user_keyword.lower() in text_content:
+                return url, True
+            
+        return url, False
         
     except Exception as e:
-        st.error(f"Error scraping {url}: {e}")
-        return None
+        st.error(f"Error scraping {url}: {str(e)}")
+        return url, False
     finally:
         try:
             driver.quit()
         except:
             pass
 
-def search_keyword_in_content(content, keyword):
-    if content and keyword:
-        return keyword.lower() in content
-    return False
-
 def main():
     st.title("Keyword Search in URL Content")
     
-    uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
-    user_keyword = st.text_input("Enter keyword to search")
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
+    
+    with col2:
+        user_keyword = st.text_input("Enter keyword to search")
     
     if uploaded_file and user_keyword:
         try:
@@ -118,7 +123,7 @@ def main():
             # Clean and validate URLs
             df['source_url'] = df['source_url'].astype(str).str.strip()
             valid_urls = df['source_url'].str.startswith(('http://', 'https://')).fillna(False)
-            df = df[valid_urls]
+            df = df[valid_urls].copy()
             
             if df.empty:
                 st.error("No valid URLs found in the file.")
@@ -129,29 +134,35 @@ def main():
             with st.spinner('Processing URLs...'):
                 matching_urls = []
                 progress_bar = st.progress(0)
+                status_text = st.empty()
                 
                 # Process URLs in parallel with progress tracking
                 total_urls = len(df)
                 completed = 0
                 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-                    future_to_url = {executor.submit(scrape_content, url): url for url in df['source_url']}
+                with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                    future_to_url = {
+                        executor.submit(process_url, url, user_keyword): url 
+                        for url in df['source_url']
+                    }
                     
                     for future in concurrent.futures.as_completed(future_to_url):
-                        url = future_to_url[future]
                         completed += 1
-                        progress_bar.progress(completed / total_urls)
+                        progress = completed / total_urls
+                        progress_bar.progress(progress)
+                        status_text.text(f"Processed {completed} of {total_urls} URLs...")
                         
                         try:
-                            content = future.result()
-                            if search_keyword_in_content(content, user_keyword):
+                            url, found = future.result()
+                            if found:
                                 matching_urls.append(url)
                         except Exception as e:
-                            st.error(f"Error processing {url}: {e}")
+                            st.error(f"Error processing URL: {str(e)}")
             
             end_time = time.time()
             elapsed_time = end_time - start_time
             
+            status_text.text("")  # Clear the status text
             st.success(f"Task completed in {elapsed_time:.2f} seconds")
             
             if matching_urls:
@@ -168,10 +179,10 @@ def main():
                     mime='text/csv',
                 )
             else:
-                st.write("No matching URLs found.")
+                st.info("No matching URLs found.")
                 
         except Exception as e:
-            st.error(f"An error occurred: {e}")
+            st.error(f"An error occurred: {str(e)}")
             st.exception(e)
 
 if __name__ == "__main__":
