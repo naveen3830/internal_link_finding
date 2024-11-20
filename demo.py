@@ -37,12 +37,12 @@ def extract_text_from_html(html_content):
     if not content_areas:
         content_areas.append(soup.body.get_text(' ', strip=True) if soup.body else '')
     
-    return ' '.join(content_areas)
+    return soup, ' '.join(content_areas)
 
-def check_keyword(text, keyword):
+def check_keyword(soup, text, keyword):
     """
     Check if keyword exists in text, handling various cases
-    Returns: (bool, list of matches with context)
+    Returns: (bool, list of matches with context, bool indicating if hyperlinked)
     """
     text = clean_text(text)
     keyword = keyword.lower().strip()
@@ -63,7 +63,19 @@ def check_keyword(text, keyword):
             start = max(0, match.start() - 50)
             end = min(len(text), match.end() + 50)
             context = f"...{text[start:end]}..."
-            matches.append(context.strip())
+            
+            # Check if the keyword is hyperlinked
+            hyperlinked = False
+            for link in soup.find_all('a'):
+                link_text = clean_text(link.get_text())
+                if variation in link_text:
+                    hyperlinked = True
+                    break
+            
+            matches.append({
+                'context': context.strip(),
+                'hyperlinked': hyperlinked
+            })
     
     return found, matches
 
@@ -80,20 +92,26 @@ def process_url(url, keyword):
         response.raise_for_status()
         
         # Extract text content
-        text_content = extract_text_from_html(response.text)
-        found, contexts = check_keyword(text_content, keyword)
+        soup, text_content = extract_text_from_html(response.text)
+        found, matches = check_keyword(soup, text_content, keyword)
         
         if found:
             return {
                 'url': url,
                 'found': True,
-                'contexts': contexts[:3]  # Limit to first 3 matches for brevity
+                'matches': matches[:3]  # Limit to first 3 matches for brevity
             }
         return None
         
     except Exception as e:
         logger.error(f"Error processing {url}: {str(e)}")
         return None
+
+@st.cache_data
+def convert_df_to_csv(download_data):
+    """Cache the CSV generation to prevent re-computation"""
+    download_df = pd.DataFrame(download_data)
+    return download_df.to_csv(index=False).encode('utf-8')
 
 def main():
     st.title("Keyword Search in URLs")
@@ -106,15 +124,21 @@ def main():
     with col2:
         keyword = st.text_input("Enter keyword to search", help="Enter the exact keyword you want to find")
         max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=2,
-                            help="Number of URLs to process simultaneously")
+                                help="Number of URLs to process simultaneously")
     
     if uploaded_file and keyword:
+        if 'results' not in st.session_state:
+            st.session_state.results = []
         try:
             # Read the file
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file)
+                st.info("Input data")
+                st.dataframe(df,use_container_width=False)
             else:
                 df = pd.read_excel(uploaded_file)
+                st.info("Input data")
+                st.dataframe(df,use_container_width=True)
             
             if 'source_url' not in df.columns:
                 st.error("File must contain a 'source_url' column")
@@ -129,53 +153,57 @@ def main():
                 st.error("No valid URLs found in the file")
                 return
             
-            st.info(f"Processing {len(df)} URLs...")
-            start_time = time.time()
-            
-            # Process URLs with progress tracking
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            results = []
-            processed = 0
-            
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                future_to_url = {
-                    executor.submit(process_url, url, keyword): url 
-                    for url in df['source_url'].unique()
-                }
+            # Avoid reprocessing if results are already in session state
+            if not st.session_state.results:
+                st.info(f"Processing {len(df)} URLs...")
+                start_time = time.time()
                 
-                for future in concurrent.futures.as_completed(future_to_url):
-                    processed += 1
-                    progress = processed / len(df)
-                    progress_bar.progress(progress)
-                    status_text.text(f"Processed {processed} of {len(df)} URLs...")
+                progress_bar = st.progress(0)
+                processed = 0
+                
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_to_url = {
+                        executor.submit(process_url, url, keyword): url
+                        for url in df['source_url'].unique()
+                    }
                     
-                    result = future.result()
-                    if result:
-                        results.append(result)
+                    for future in concurrent.futures.as_completed(future_to_url):
+                        processed += 1
+                        progress = processed / len(df)
+                        progress_bar.progress(progress)
+                        
+                        result = future.result()
+                        if result:
+                            st.session_state.results.append(result)
+                
+                progress_bar.empty()
+                duration = time.time() - start_time
+                st.info(f"Search completed in {duration:.2f} seconds")
             
-            # Clear progress indicators
-            progress_bar.empty()
-            status_text.empty()
+            results = st.session_state.results
             
             if results:
                 st.success(f"Found keyword in {len(results)} URLs")
-                results_df = pd.DataFrame(results)
                 
                 with st.expander("View Results", expanded=True):
-                    for _, row in results_df.iterrows():
+                    for result in results:
                         st.write("---")
-                        st.write(f"🔗 {row['url']}")
+                        st.write(f"🔗 {result['url']}")
                         st.write("Matches found:")
-                        for context in row['contexts']:
-                            st.markdown(f"- _{context}_")
+                        for match in result['matches']:
+                            hyperlink_status = "🔗 Hyperlinked" if match['hyperlinked'] else "❌ Not Hyperlinked"
+                            st.markdown(f"- _{match['context']}_ ({hyperlink_status})")
                 
-                download_df = pd.DataFrame({
-                    'url': [r['url'] for r in results],
-                    'context': [' | '.join(r['contexts']) for r in results]
-                })
+                download_data = []
+                for result in results:
+                    for match in result['matches']:
+                        download_data.append({
+                            'url': result['url'],
+                            'context': match['context'],
+                            'hyperlinked': match['hyperlinked']
+                        })
                 
-                csv = download_df.to_csv(index=False).encode('utf-8')
+                csv = convert_df_to_csv(download_data)
                 st.download_button(
                     label="Download Results CSV",
                     data=csv,
@@ -184,10 +212,6 @@ def main():
                 )
             else:
                 st.warning(f"No URLs containing '{keyword}' were found")
-            
-            duration = time.time() - start_time
-            st.info(f"Search completed in {duration:.2f} seconds")
-            
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
             logger.exception("Error in main execution")
