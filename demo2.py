@@ -1,15 +1,12 @@
 import streamlit as st
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-import concurrent.futures
 import time
 import logging
-from urllib3.exceptions import InsecureRequestWarning
+import concurrent.futures
 import re
+from playwright.sync_api import sync_playwright
 
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
-
+# Streamlit configuration
 st.set_page_config(page_title="Keyword Search", layout="wide")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,7 +15,9 @@ def clean_text(text):
     """Clean text content for better keyword matching"""
     if not text:
         return ""
+    # Remove HTML tags
     text = re.sub(r'<[^>]+>', ' ', text)
+    # Remove special characters and extra whitespace
     text = re.sub(r'\s+', ' ', text)
     return text.lower().strip()
 
@@ -26,24 +25,21 @@ def extract_text_from_html(html_content):
     """Extract meaningful text from HTML while preserving some structure"""
     soup = BeautifulSoup(html_content, 'html.parser')
     
+    # Remove unwanted elements
     for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link']):
         element.decompose()
-    content_areas = []
     
+    content_areas = []
     main_content = soup.find(['main', 'article', 'div'], class_=lambda x: x and any(term in str(x).lower() for term in ['content', 'main', 'article']))
     if main_content:
         content_areas.append(main_content.get_text(' ', strip=True))
-    
     if not content_areas:
         content_areas.append(soup.body.get_text(' ', strip=True) if soup.body else '')
     
     return ' '.join(content_areas)
 
 def check_keyword(text, keyword):
-    """
-    Check if keyword exists in text, handling various cases
-    Returns: (bool, list of matches with context)
-    """
+    """Check if keyword exists in text, handling various cases"""
     text = clean_text(text)
     keyword = keyword.lower().strip()
     
@@ -68,29 +64,25 @@ def check_keyword(text, keyword):
     return found, matches
 
 def process_url(url, keyword):
-    """Process a single URL and check for keyword presence"""
+    """Process a single URL and check for keyword presence using Playwright"""
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-        }
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url, timeout=10000)
+            html_content = page.content()
+            browser.close()
         
-        response = requests.get(url, headers=headers, timeout=10, verify=False)
-        response.raise_for_status()
-        
-        # Extract text content
-        text_content = extract_text_from_html(response.text)
-        found, contexts = check_keyword(text_content, keyword)
-        
-        if found:
-            return {
-                'url': url,
-                'found': True,
-                'contexts': contexts[:3]  # Limit to first 3 matches for brevity
-            }
+            text_content = extract_text_from_html(html_content)
+            found, contexts = check_keyword(text_content, keyword)
+            
+            if found:
+                return {
+                    'url': url,
+                    'found': True,
+                    'contexts': contexts[:3]
+                }
         return None
-        
     except Exception as e:
         logger.error(f"Error processing {url}: {str(e)}")
         return None
@@ -105,12 +97,11 @@ def main():
     
     with col2:
         keyword = st.text_input("Enter keyword to search", help="Enter the exact keyword you want to find")
-        max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=2,
+        max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=5,
                             help="Number of URLs to process simultaneously")
     
     if uploaded_file and keyword:
         try:
-            # Read the file
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file)
             else:
@@ -120,7 +111,6 @@ def main():
                 st.error("File must contain a 'source_url' column")
                 return
             
-            # Clean and validate URLs
             df['source_url'] = df['source_url'].astype(str).str.strip()
             valid_urls = df['source_url'].str.match(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
             df = df[valid_urls].copy()
@@ -132,7 +122,6 @@ def main():
             st.info(f"Processing {len(df)} URLs...")
             start_time = time.time()
             
-            # Process URLs with progress tracking
             progress_bar = st.progress(0)
             status_text = st.empty()
             results = []
@@ -154,12 +143,12 @@ def main():
                     if result:
                         results.append(result)
             
-            # Clear progress indicators
             progress_bar.empty()
             status_text.empty()
             
             if results:
                 st.success(f"Found keyword in {len(results)} URLs")
+                
                 results_df = pd.DataFrame(results)
                 
                 with st.expander("View Results", expanded=True):
