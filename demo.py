@@ -130,7 +130,6 @@ def main():
         if 'results' not in st.session_state:
             st.session_state.results = []
         try:
-            # Read the file
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file)
                 st.info("Input data")
@@ -144,7 +143,6 @@ def main():
                 st.error("File must contain a 'source_url' column")
                 return
             
-            # Clean and validate URLs
             df['source_url'] = df['source_url'].astype(str).str.strip()
             valid_urls = df['source_url'].str.match(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
             df = df[valid_urls].copy()
@@ -153,7 +151,6 @@ def main():
                 st.error("No valid URLs found in the file")
                 return
             
-            # Avoid reprocessing if results are already in session state
             if not st.session_state.results:
                 st.info(f"Processing {len(df)} URLs...")
                 start_time = time.time()
