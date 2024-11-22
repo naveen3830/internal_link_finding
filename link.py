@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
-from scrapy.crawler import CrawlerProcess
+from scrapy.crawler import CrawlerRunner
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy.linkextractors import LinkExtractor
+from twisted.internet import reactor, defer
+from scrapy import signals
 from urllib.parse import urlparse
 
 # Scrapy Spider
@@ -41,8 +43,10 @@ class OptimizedWebCrawler(CrawlSpider):
     def parse_item(self, response):
         yield {'source_url': response.url}
 
+# Function to run the crawler asynchronously
+@defer.inlineCallbacks
 def run_crawler(url, max_depth, output_file):
-    process = CrawlerProcess(settings={
+    runner = CrawlerRunner(settings={
         'FEEDS': {
             output_file: {
                 'format': 'csv',
@@ -52,8 +56,17 @@ def run_crawler(url, max_depth, output_file):
         },
         'USER_AGENT': 'Mozilla/5.0 (compatible; WebCrawler/1.0)'
     })
-    process.crawl(OptimizedWebCrawler, start_url=url, max_depth=max_depth)
-    process.start()
+
+    yield runner.crawl(OptimizedWebCrawler, start_url=url, max_depth=max_depth)
+    reactor.stop()
+
+# Wrapper function to manage reactor
+def crawl(url, max_depth, output_file):
+    if reactor.running:
+        st.error("Reactor is already running. Please reload the app.")
+        return
+    reactor.callWhenRunning(run_crawler, url, max_depth, output_file)
+    reactor.run()
 
 def main():
     st.title("Web Link Crawler 🕸️")
@@ -76,7 +89,7 @@ def main():
 
         with st.spinner("Crawling website and extracting links..."):
             try:
-                run_crawler(url, max_depth, output_file)
+                crawl(url, max_depth, output_file)
                 if os.path.exists(output_file):
                     df = pd.read_csv(output_file)
                     st.success(f"Successfully crawled {len(df)} links!")
