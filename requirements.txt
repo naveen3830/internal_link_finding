@@ -6,3 +6,5 @@ pandas
 streamlit
 beautifulsoup4
 chrome-version
+webdriver-manager
+urllib3
