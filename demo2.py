@@ -8,14 +8,16 @@ import logging
 from urllib3.exceptions import InsecureRequestWarning
 import re
 
+# Disable warnings
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-st.set_page_config(page_title="Keyword Search", layout="wide")
+# Streamlit and logging configuration
+st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def clean_text(text):
-    """Clean text content for better keyword matching"""
+    """Clean and normalize text for consistent matching."""
     if not text:
         return ""
     text = re.sub(r'<[^>]+>', ' ', text)
@@ -23,154 +25,110 @@ def clean_text(text):
     return text.lower().strip()
 
 def extract_text_from_html(html_content):
-    """Extract meaningful text from HTML while preserving some structure"""
+    """Extract meaningful text from HTML while preserving structure."""
     soup = BeautifulSoup(html_content, 'html.parser')
     
     for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link']):
         element.decompose()
-    content_areas = []
     
-    main_content = soup.find(['main', 'article', 'div'], class_=lambda x: x and any(term in str(x).lower() for term in ['content', 'main', 'article']))
-    if main_content:
-        content_areas.append(main_content.get_text(' ', strip=True))
-    
-    if not content_areas:
-        content_areas.append(soup.body.get_text(' ', strip=True) if soup.body else '')
-    
-    return soup, ' '.join(content_areas)
+    return soup
 
-def check_keyword(soup, text, keyword):
-    """
-    Check if keyword exists in text, handling various cases
-    Returns: (bool, list of matches with context, bool indicating if hyperlinked)
-    """
-    text = clean_text(text)
-    keyword = keyword.lower().strip()
+def find_unlinked_keywords(soup, keyword, target_url):
+    """Find occurrences of a keyword that are not already hyperlinked."""
+    keyword = keyword.strip()
+    unlinked_occurrences = []
     
-    variations = [keyword]
-    if ' ' in keyword:
-        variations.append(keyword.replace(' ', '-'))
-        variations.append(keyword.replace(' ', ''))
+    text_elements = soup.find_all(text=True)
+    existing_links = set(clean_text(link.get_text()) for link in soup.find_all('a'))
     
-    matches = []
-    found = False
-    
-    for variation in variations:
-        pattern = r'\b' + re.escape(variation) + r'\b'
+    for element in text_elements:
+        if not element.strip() or element.parent.name == 'a':
+            continue
         
-        for match in re.finditer(pattern, text):
-            found = True
-            start = max(0, match.start() - 50)
-            end = min(len(text), match.end() + 50)
-            context = f"...{text[start:end]}..."
+        clean_element = clean_text(element)
+        matches = list(re.finditer(r'\b' + re.escape(keyword) + r'\b', clean_element))
+        
+        for match in matches:
+            match_text = element[match.start():match.end()]
             
-            # Check if the keyword is hyperlinked
-            hyperlinked = False
-            for link in soup.find_all('a'):
-                link_text = clean_text(link.get_text())
-                if variation in link_text:
-                    hyperlinked = True
-                    break
-            
-            matches.append({
-                'context': context.strip(),
-                'hyperlinked': hyperlinked
-            })
-    
-    return found, matches
-
-def check_hyperlink_keywords(soup, keyword):
-    """Find hyperlinks containing the keyword"""
-    keyword = keyword.lower().strip()
-    hyperlinked_urls = []
-    
-    for link in soup.find_all('a'):
-        link_text = clean_text(link.get_text())
-        href = link.get('href', '')
-        
-        # Check various keyword variations
-        variations = [keyword]
-        if ' ' in keyword:
-            variations.append(keyword.replace(' ', '-'))
-            variations.append(keyword.replace(' ', ''))
-        
-        for variation in variations:
-            if variation in link_text:
-                hyperlinked_urls.append({
-                    'url': href,
-                    'link_text': link.get_text().strip()
+            if clean_text(match_text) not in existing_links:
+                start = max(0, match.start() - 50)
+                end = min(len(element), match.end() + 50)
+                context = element[start:end].strip()
+                
+                unlinked_occurrences.append({
+                    'context': context,
+                    'keyword': keyword
                 })
-                break
     
-    return hyperlinked_urls
+    return unlinked_occurrences
 
-def process_url(url, keyword):
-    """Process a single URL and check for keyword presence"""
+def process_url(url, keyword, target_url):
+    """Process a single URL to find unlinked keyword opportunities."""
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5',
         }
-        
         response = requests.get(url, headers=headers, timeout=10, verify=False)
         response.raise_for_status()
         
-        # Extract text content
-        soup, text_content = extract_text_from_html(response.text)
+        soup = extract_text_from_html(response.text)
+        unlinked_matches = find_unlinked_keywords(soup, keyword, target_url)
         
-        # Check for keyword in text
-        found, matches = check_keyword(soup, text_content, keyword)
-        
-        # Find hyperlinks with keyword
-        hyperlinked_keywords = check_hyperlink_keywords(soup, keyword)
-        
-        if found or hyperlinked_keywords:
+        if unlinked_matches:
             return {
                 'url': url,
-                'found': found,
-                'matches': matches[:3] if found else [],
-                'hyperlinked_keywords': hyperlinked_keywords
+                'unlinked_matches': unlinked_matches
             }
         return None
-        
     except Exception as e:
         logger.error(f"Error processing {url}: {str(e)}")
         return None
 
 @st.cache_data
 def convert_df_to_csv(download_data):
-    """Cache the CSV generation to prevent re-computation"""
+    """Cache the CSV generation to prevent re-computation."""
     download_df = pd.DataFrame(download_data)
     return download_df.to_csv(index=False).encode('utf-8')
 
 def main():
-    st.title("Keyword Search in URLs")
+    st.title("Internal Linking Opportunities Finder")
     
-    col1, col2, col3 = st.columns([2, 1, 2])
+    # Create columns for inputs
+    col1, col2, col3 = st.columns([2, 2, 2])
     
     with col1:
-        uploaded_file = st.file_uploader("Upload CSV or Excel file with URLs", type=["csv", "xlsx"])
+        uploaded_file = st.file_uploader("Upload CSV or Excel file with URLs", 
+                                         type=["csv", "xlsx"], 
+                                         key="url_file_uploader")
     
     with col2:
-        keyword = st.text_input("Enter keyword to search", help="Enter the exact keyword you want to find")
+        keyword = st.text_input("Enter keyword to find", 
+                                help="Find this keyword without existing links",
+                                key="keyword_input")
     
-    max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=2,
-                            help="Number of URLs to process simultaneously")
+    with col3:
+        target_url = st.text_input("Target URL for linking", 
+                                   help="URL to suggest for internal linking",
+                                   key="target_url_input")
     
-    if uploaded_file and keyword:
-        if 'results' not in st.session_state:
-            st.session_state.results = []
+    max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=2, 
+                             help="Number of URLs to process simultaneously")
+
+    if uploaded_file and keyword and target_url:
+        # Reset results each time the inputs change
+        st.session_state.results = []
+        
         try:
+            # Read the file
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file)
-                st.info("Input data")
-                st.dataframe(df,use_container_width=False)
             else:
                 df = pd.read_excel(uploaded_file)
-                st.info("Input data")
-                st.dataframe(df,use_container_width=True)
             
+            # Validate URL column
             if 'source_url' not in df.columns:
                 st.error("File must contain a 'source_url' column")
                 return
@@ -183,83 +141,57 @@ def main():
                 st.error("No valid URLs found in the file")
                 return
             
-            if not st.session_state.results:
-                st.info(f"Processing {len(df)} URLs...")
-                start_time = time.time()
-                
-                progress_bar = st.progress(0)
-                processed = 0
-                
-                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    future_to_url = {
-                        executor.submit(process_url, url, keyword): url
-                        for url in df['source_url'].unique()
-                    }
-                    
-                    for future in concurrent.futures.as_completed(future_to_url):
-                        processed += 1
-                        progress = processed / len(df)
-                        progress_bar.progress(progress)
-                        
-                        result = future.result()
-                        if result:
-                            st.session_state.results.append(result)
-                
-                progress_bar.empty()
-                duration = time.time() - start_time
-                st.info(f"Search completed in {duration:.2f} seconds")
+            st.info(f"Processing {len(df)} URLs...")
+            start_time = time.time()
+            progress_bar = st.progress(0)
+            processed = 0
+            results = []
             
-            results = st.session_state.results
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_url = {executor.submit(process_url, url, keyword, target_url): url for url in df['source_url'].unique()}
+                
+                for future in concurrent.futures.as_completed(future_to_url):
+                    processed += 1
+                    progress = processed / len(df)
+                    progress_bar.progress(progress)
+                    result = future.result()
+                    
+                    if result:
+                        results.append(result)
+            
+            progress_bar.empty()
+            duration = time.time() - start_time
+            st.info(f"Search completed in {duration:.2f} seconds")
             
             if results:
-                # Download data for both text keyword matches and hyperlinks
                 download_data = []
+                st.success(f"Unlinked keyword opportunities found in {len(results)} URLs")
                 
-                st.success(f"Results found in {len(results)} URLs")
-                
-                with st.expander("View Results", expanded=True):
+                with st.expander("View Opportunities", expanded=True):
                     for result in results:
                         st.write("---")
-                        st.write(f"🔗 {result['url']}")
+                        st.write(f"🔗 Source URL: {result['url']}")
                         
-                        # Text keyword matches
-                        if result.get('found', False):
-                            st.write("Text Keyword Matches:")
-                            for match in result['matches']:
-                                hyperlink_status = "🔗 Hyperlinked" if match['hyperlinked'] else "❌ Not Hyperlinked"
-                                st.markdown(f"- _{match['context']}_ ({hyperlink_status})")
-                                
+                        if result.get('unlinked_matches'):
+                            st.write("Unlinked Keyword Occurrences:")
+                            for match in result['unlinked_matches']:
+                                st.markdown(f"- *{match['keyword']}*: _{match['context']}_")
                                 download_data.append({
-                                    'url': result['url'],
-                                    'context': match['context'],
-                                    'hyperlinked': match['hyperlinked'],
-                                    'type': 'text_match'
-                                })
-                        
-                        # Hyperlinked keywords
-                        if result.get('hyperlinked_keywords'):
-                            st.write("Hyperlinked Keywords:")
-                            for link in result['hyperlinked_keywords']:
-                                st.markdown(f"- '{link['link_text']}' (hyperlinked) → {link['url']}")
-                                
-                                download_data.append({
-                                    'url': result['url'],
-                                    'hyperlink_text': link['link_text'],
-                                    'hyperlink_url': link['url'],
-                                    'type': 'hyperlink'
+                                    'source_url': result['url'],
+                                    'keyword': match['keyword'],
+                                    'context': match['context']
                                 })
                 
-                # Download button with comprehensive results
                 if download_data:
                     csv = convert_df_to_csv(download_data)
                     st.download_button(
-                        label="Download Results CSV",
-                        data=csv,
-                        file_name=f'keyword_matches_{keyword}.csv',
+                        label="Download Opportunities CSV", 
+                        data=csv, 
+                        file_name=f'unlinked_keyword_opportunities_{keyword}.csv', 
                         mime='text/csv'
                     )
             else:
-                st.warning(f"No URLs containing '{keyword}' were found")
+                st.warning(f"No unlinked keyword opportunities found for '{keyword}'")
         
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
