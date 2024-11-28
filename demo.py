@@ -65,6 +65,10 @@ def find_unlinked_keywords(soup, keyword, target_url):
 
 def process_url(url, keyword, target_url):
     """Process a single URL to find unlinked keyword opportunities."""
+    # Skip processing if the URL is the same as the target URL
+    if url.strip().rstrip('/') == target_url.strip().rstrip('/'):
+        return None
+    
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
