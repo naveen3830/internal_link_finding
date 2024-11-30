@@ -8,3 +8,8 @@ beautifulsoup4
 chrome-version
 webdriver-manager
 urllib3
+aiohttp
+asyncio
+beautifulsoup4
+lxml
+nest_asyncio
