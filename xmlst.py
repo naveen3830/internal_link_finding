@@ -195,7 +195,7 @@ def parse_sitemap(sitemap_content):
     
     return urls
 
-st.title("Multilingual Sitemap URL Fetcher")
+st.title("Sitemap URL Fetcher")
 st.write("Enter a website URL to fetch sitemap URLs.")
 
 website_url = st.text_input("Website URL (e.g., https://example.com):", "")
