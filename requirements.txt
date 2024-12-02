@@ -13,3 +13,4 @@ asyncio
 beautifulsoup4
 lxml
 nest_asyncio
+streamlit_option_menu
