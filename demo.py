@@ -12,7 +12,7 @@ import re
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 # Streamlit and logging configuration
-st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
+# st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -27,19 +27,26 @@ def clean_text(text):
 def extract_text_from_html(html_content):
     """Extract meaningful text from HTML while preserving structure."""
     soup = BeautifulSoup(html_content, 'html.parser')
-    
-    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link']):
+    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 'h1', 'h2', 'h3']):
+        element.decompose()
+
+    for element in soup.find_all(attrs={"class": [
+        "position-relative mt-5 related-blog-post__swiper-container", 
+        "row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0"
+    ]}):
         element.decompose()
     
     return soup
 
+
 def find_unlinked_keywords(soup, keyword, target_url):
-    """Find occurrences of a keyword that are not already hyperlinked."""
     keyword = keyword.strip()
     unlinked_occurrences = []
-    
     text_elements = soup.find_all(text=True)
-    existing_links = set(clean_text(link.get_text()) for link in soup.find_all('a'))
+    existing_links = {
+        clean_text(link.get_text())
+        for link in soup.find_all('a') if link.get_text()
+    }
     
     for element in text_elements:
         if not element.strip() or element.parent.name == 'a':
@@ -50,8 +57,10 @@ def find_unlinked_keywords(soup, keyword, target_url):
         
         for match in matches:
             match_text = element[match.start():match.end()]
+            clean_match_text = clean_text(match_text)
             
-            if clean_text(match_text) not in existing_links:
+            # Only include if the keyword is NOT in any existing links
+            if clean_match_text not in existing_links:
                 start = max(0, match.start() - 50)
                 end = min(len(element), match.end() + 50)
                 context = element[start:end].strip()
@@ -97,29 +106,29 @@ def convert_df_to_csv(download_data):
     download_df = pd.DataFrame(download_data)
     return download_df.to_csv(index=False).encode('utf-8')
 
-def main():
-    st.title("Internal Linking Opportunities Finder")
+def Home():
+    st.header("Internal Linking Opportunities Finder",divider='rainbow')
     
     # Create columns for inputs
-    col1, col2, col3 = st.columns([2, 2, 2])
-    
+    # col1= st.columns([2])
+
+    # with col1:
+    uploaded_file = st.file_uploader("Upload CSV or Excel file with URLs", 
+                                        type=["csv", "xlsx"], 
+                                        key="url_file_uploader")
+    col1, col2=st.columns([3,3])
     with col1:
-        uploaded_file = st.file_uploader("Upload CSV or Excel file with URLs", 
-                                         type=["csv", "xlsx"], 
-                                         key="url_file_uploader")
-    
-    with col2:
         keyword = st.text_input("Enter keyword to find", 
                                 help="Find this keyword without existing links",
                                 key="keyword_input")
     
-    with col3:
+    with col2:
         target_url = st.text_input("Target URL for linking", 
-                                   help="URL to suggest for internal linking",
-                                   key="target_url_input")
+                                help="URL to suggest for internal linking",
+                                key="target_url_input")
     
     max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=2, 
-                             help="Number of URLs to process simultaneously")
+                            help="Number of URLs to process simultaneously")
 
     if uploaded_file and keyword and target_url:
         # Reset results each time the inputs change
@@ -186,14 +195,37 @@ def main():
                                     'context': match['context']
                                 })
                 
+                
                 if download_data:
                     csv = convert_df_to_csv(download_data)
+                    
+                    if 'csv_download_triggered' not in st.session_state:
+                        st.session_state.csv_download_triggered = False
+
+                    def trigger_download():
+                        st.session_state.csv_download_triggered = True
+
                     st.download_button(
-                        label="Download Opportunities CSV", 
-                        data=csv, 
-                        file_name=f'unlinked_keyword_opportunities_{keyword}.csv', 
-                        mime='text/csv'
+                        label="Download Opportunities CSV",
+                        data=csv,
+                        file_name=f'unlinked_keyword_opportunities_{keyword}.csv',
+                        mime='text/csv',
+                        on_click=trigger_download
                     )
+
+                    # Prevent the app from re-processing data on button click
+                    if st.session_state.csv_download_triggered:
+                        st.session_state.csv_download_triggered = False
+
+                
+        #         if download_data:
+        #             csv = convert_df_to_csv(download_data)
+        #             st.download_button(
+        #                 label="Download Opportunities CSV", 
+        #                 data=csv, 
+        #                 file_name=f'unlinked_keyword_opportunities_{keyword}.csv', 
+        #                 mime='text/csv'
+        #             )
             else:
                 st.warning(f"No unlinked keyword opportunities found for '{keyword}'")
         
@@ -201,5 +233,5 @@ def main():
             st.error(f"An error occurred: {str(e)}")
             logger.exception("Error in main execution")
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
