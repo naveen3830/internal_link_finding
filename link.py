@@ -21,6 +21,7 @@ def link():
     """)
     
     tab1, tab2 = st.tabs([ "URL Extractor Using Sitemap","URL Extractor"])
+    
     with tab1:
         def detect_url_language(url):
             parsed_url = urlparse(url)
@@ -172,7 +173,6 @@ def link():
                 pass
             return urls
         
-        # st.subheader("Sitemap URL Fetcher")
         st.write("Enter a website URL to fetch sitemap URLs.")
         website_url = st.text_input("Website URL (e.g., https://example.com):", "")
 
@@ -191,7 +191,7 @@ def link():
             st.session_state.lang_df = None
             st.session_state.previous_url = website_url
 
-        if website_url:
+        if st.button("Extract URLs",key="extract_links") and website_url:
             if not website_url.startswith("http"):
                 st.error("Please enter a valid URL starting with http or https.")
             else:
@@ -207,28 +207,33 @@ def link():
                                 progress_bar.progress(int((i + 1) / len(st.session_state.all_urls) * 100))
                                 url_lang = detect_url_language(url)
                                 st.session_state.language_results.append({
-                                    'URL': url,
+                                    'source_url': url,
                                     'Language': url_lang})
                             progress_bar.empty()
                             st.session_state.lang_df = pd.DataFrame(st.session_state.language_results)
                         else:
                             st.error("No sitemap or URLs found.")
-                            
-                if st.session_state.lang_df is not None:
-                    st.dataframe(st.session_state.lang_df)
-                    unique_languages = st.session_state.lang_df['Language'].dropna().unique().tolist()
-                    selected_languages = st.multiselect(
-                        "Select languages to keep:", 
-                        unique_languages, 
-                        default=unique_languages,
-                        key='language_selector')
-                    filtered_df = st.session_state.lang_df[st.session_state.lang_df['Language'].isin(selected_languages)]
-                    st.success(f"Found {len(filtered_df)} URLs in selected languages.")
-                    st.dataframe(filtered_df)
-                    
-                    filtered_urls = filtered_df[['URL']].rename(columns={'URL': 'source_url'})
-                    csv_data = filtered_urls.to_csv(index=False).encode('utf-8')
-                    st.download_button(label="Download Filtered URLs",data=csv_data,file_name="filtered_urls.csv",mime="text/csv")
+
+        if st.session_state.lang_df is not None:
+            st.dataframe(st.session_state.lang_df)
+            unique_languages = st.session_state.lang_df['Language'].dropna().unique().tolist()
+            selected_languages = st.multiselect(
+                "Select languages to keep:", 
+                unique_languages, 
+                default=unique_languages,
+                key='language_selector')
+            
+            filtered_df = st.session_state.lang_df[st.session_state.lang_df['Language'].isin(selected_languages)]
+            
+            # Store filtered_df in session_state
+            st.session_state.filtered_df = filtered_df
+            
+            st.success(f"Found {len(filtered_df)} URLs in selected languages.")
+            st.dataframe(filtered_df)
+                
+            filtered_urls = filtered_df[['source_url']].rename(columns={'source_url': 'source_url'})
+            csv_data = filtered_urls.to_csv(index=False).encode('utf-8')
+            st.download_button(label="Download Filtered URLs",data=csv_data,file_name="filtered_urls.csv",mime="text/csv")
                 
     with tab2:
         def extract_links(url):
@@ -254,7 +259,7 @@ def link():
         st.write("Enter a webpage URL to extract all the links from it.")
         page_url = st.text_input("Enter the URL (e.g., https://pages.ebay.com/sitemap.html):", "")
 
-        if st.button("Extract Links"):
+        if st.button("Extract URLs",key="extract_urls"):
             if page_url:
                 if not page_url.startswith("http"):
                     st.error("Please enter a valid URL starting with http or https.")

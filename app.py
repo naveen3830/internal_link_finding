@@ -11,7 +11,6 @@ from streamlit_option_menu import option_menu
 from demo import Home
 from link import link
 
-
 st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
 st.markdown(
         """

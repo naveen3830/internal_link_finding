@@ -107,131 +107,117 @@ def convert_df_to_csv(download_data):
     return download_df.to_csv(index=False).encode('utf-8')
 
 def Home():
-    st.header("Internal Linking Opportunities Finder",divider='rainbow')
-    
-    # Create columns for inputs
-    # col1= st.columns([2])
+    st.header("Internal Linking Opportunities Finder", divider='rainbow')
 
-    # with col1:
-    uploaded_file = st.file_uploader("Upload CSV or Excel file with URLs", 
-                                        type=["csv", "xlsx"], 
-                                        key="url_file_uploader")
-    col1, col2=st.columns([3,3])
+    # Check if filtered_df exists in session state
+    df = None  # Initialize the DataFrame variable
+    if 'filtered_df' in st.session_state and st.session_state.filtered_df is not None:
+        st.success("Using filtered data from the previous tab.")
+        df = st.session_state.filtered_df
+    else:
+        # Fallback: ask user to upload a file if filtered_df isn't available
+        uploaded_file = st.file_uploader("Upload CSV or Excel file with URLs",
+                                         type=["csv", "xlsx"],
+                                         key="url_file_uploader")
+        if uploaded_file:
+            try:
+                if uploaded_file.name.endswith(".csv"):
+                    df = pd.read_csv(uploaded_file)
+                elif uploaded_file.name.endswith(".xlsx"):
+                    df = pd.read_excel(uploaded_file)
+                else:
+                    st.error("Unsupported file format!")
+                    return
+            except Exception as e:
+                st.error(f"An error occurred while reading the file: {str(e)}")
+                return
+
+    col1, col2 = st.columns([3, 3])
     with col1:
-        keyword = st.text_input("Enter keyword to find", 
+        keyword = st.text_input("Enter keyword to find",
                                 help="Find this keyword without existing links",
                                 key="keyword_input")
-    
+
     with col2:
-        target_url = st.text_input("Target URL for linking", 
-                                help="URL to suggest for internal linking",
-                                key="target_url_input")
-    
-    max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=2, 
+        target_url = st.text_input("Target URL for linking",
+                                   help="URL to suggest for internal linking",
+                                   key="target_url_input")
+
+    max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=2,
                             help="Number of URLs to process simultaneously")
 
-    if uploaded_file and keyword and target_url:
-        # Reset results each time the inputs change
-        st.session_state.results = []
-        
-        try:
-            # Read the file
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file)
-            
-            # Validate URL column
-            if 'source_url' not in df.columns:
-                st.error("File must contain a 'source_url' column")
-                return
-            
-            df['source_url'] = df['source_url'].astype(str).str.strip()
-            valid_urls = df['source_url'].str.match(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
-            df = df[valid_urls].copy()
-            
-            if df.empty:
-                st.error("No valid URLs found in the file")
-                return
-            
-            st.info(f"Processing {len(df)} URLs...")
-            start_time = time.time()
-            progress_bar = st.progress(0)
-            processed = 0
-            results = []
-            
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                future_to_url = {executor.submit(process_url, url, keyword, target_url): url for url in df['source_url'].unique()}
-                
-                for future in concurrent.futures.as_completed(future_to_url):
-                    processed += 1
-                    progress = processed / len(df)
-                    progress_bar.progress(progress)
-                    result = future.result()
-                    
-                    if result:
-                        results.append(result)
-            
-            progress_bar.empty()
-            duration = time.time() - start_time
-            st.info(f"Search completed in {duration:.2f} seconds")
-            
-            if results:
-                download_data = []
-                st.success(f"Unlinked keyword opportunities found in {len(results)} URLs")
-                
-                with st.expander("View Opportunities", expanded=True):
-                    for result in results:
-                        st.write("---")
-                        st.write(f"🔗 Source URL: {result['url']}")
-                        
-                        if result.get('unlinked_matches'):
-                            st.write("Unlinked Keyword Occurrences:")
-                            for match in result['unlinked_matches']:
-                                st.markdown(f"- *{match['keyword']}*: _{match['context']}_")
-                                download_data.append({
-                                    'source_url': result['url'],
-                                    'keyword': match['keyword'],
-                                    'context': match['context']
-                                })
-                
-                
-                if download_data:
-                    csv = convert_df_to_csv(download_data)
-                    
-                    if 'csv_download_triggered' not in st.session_state:
-                        st.session_state.csv_download_triggered = False
+    if st.button("Process"):
+        if df is not None and keyword and target_url:
+            try:
+                # Validate URL column
+                if 'source_url' not in df.columns:
+                    st.error("File must contain a 'source_url' column")
+                    return
 
-                    def trigger_download():
-                        st.session_state.csv_download_triggered = True
+                df['source_url'] = df['source_url'].astype(str).str.strip()
+                valid_urls = df['source_url'].str.match(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
+                df = df[valid_urls].copy()
 
-                    st.download_button(
-                        label="Download Opportunities CSV",
-                        data=csv,
-                        file_name=f'unlinked_keyword_opportunities_{keyword}.csv',
-                        mime='text/csv',
-                        on_click=trigger_download
-                    )
+                if df.empty:
+                    st.error("No valid URLs found in the file")
+                    return
 
-                    # Prevent the app from re-processing data on button click
-                    if st.session_state.csv_download_triggered:
-                        st.session_state.csv_download_triggered = False
+                st.info(f"Processing {len(df)} URLs...")
+                start_time = time.time()
+                progress_bar = st.progress(0)
+                processed = 0
+                results = []
 
-                
-        #         if download_data:
-        #             csv = convert_df_to_csv(download_data)
-        #             st.download_button(
-        #                 label="Download Opportunities CSV", 
-        #                 data=csv, 
-        #                 file_name=f'unlinked_keyword_opportunities_{keyword}.csv', 
-        #                 mime='text/csv'
-        #             )
-            else:
-                st.warning(f"No unlinked keyword opportunities found for '{keyword}'")
-        
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
-            logger.exception("Error in main execution")
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_to_url = {executor.submit(process_url, url, keyword, target_url): url for url in df['source_url'].unique()}
 
-# if __name__ == "__main__":
-#     main()
+                    for future in concurrent.futures.as_completed(future_to_url):
+                        processed += 1
+                        progress = processed / len(df)
+                        progress_bar.progress(progress)
+                        result = future.result()
+
+                        if result:
+                            results.append(result)
+
+                progress_bar.empty()
+                duration = time.time() - start_time
+                st.info(f"Search completed in {duration:.2f} seconds")
+
+                if results:
+                    download_data = []
+                    st.success(f"Unlinked keyword opportunities found in {len(results)} URLs")
+
+                    with st.expander("View Opportunities", expanded=True):
+                        for result in results:
+                            st.write("---")
+                            st.write(f"🔗 Source URL: {result['url']}")
+
+                            if result.get('unlinked_matches'):
+                                st.write("Unlinked Keyword Occurrences:")
+                                for match in result['unlinked_matches']:
+                                    st.markdown(f"- *{match['keyword']}*: _{match['context']}_")
+                                    download_data.append({
+                                        'source_url': result['url'],
+                                        'keyword': match['keyword'],
+                                        'context': match['context']
+                                    })
+
+                    if download_data:
+                        csv = convert_df_to_csv(download_data)
+                        st.download_button(
+                            label="Download Opportunities CSV",
+                            data=csv,
+                            file_name=f'unlinked_keyword_opportunities_{keyword}.csv',
+                            mime='text/csv'
+                        )
+                else:
+                    st.warning(f"No unlinked keyword opportunities found for '{keyword}'")
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+        else:
+            st.warning("Please provide all inputs and ensure valid data is available.")
+
+
+    # if __name__ == "__main__":
+    #     main()
