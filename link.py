@@ -17,12 +17,10 @@ def link():
         st.write("""
         This app is designed to help extract URLs from a given website or sitemap. It provides two main functionalities:
         *   **URL Extractor Using Sitemap**: This feature allows you to extract URLs from a website's sitemap.
-        *   **URL Extractor**: This feature enables you to extract URLs from a specific webpage.
     """)
     
-    tab1, tab2 = st.tabs([ "URL Extractor Using Sitemap","URL Extractor"])
-    
-    with tab1:
+    # tab1= st.tabs([ "URL Extractor Using Sitemap"])
+    # with tab1:
         def detect_url_language(url):
             parsed_url = urlparse(url)
             path = parsed_url.path.lower()
@@ -235,44 +233,44 @@ def link():
             csv_data = filtered_urls.to_csv(index=False).encode('utf-8')
             st.download_button(label="Download Filtered URLs",data=csv_data,file_name="filtered_urls.csv",mime="text/csv")
                 
-    with tab2:
-        def extract_links(url):
-            try:
-                response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
+    # with tab2:
+    #     def extract_links(url):
+    #         try:
+    #             response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
 
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    links = []
-                    for a_tag in soup.find_all('a', href=True):
-                        full_url = urljoin(url, a_tag['href'])
-                        links.append(full_url)
-                    return links
-                else:
-                    st.error(f"Error: Received status code {response.status_code}")
-                    return []
+    #             if response.status_code == 200:
+    #                 soup = BeautifulSoup(response.content, 'html.parser')
+    #                 links = []
+    #                 for a_tag in soup.find_all('a', href=True):
+    #                     full_url = urljoin(url, a_tag['href'])
+    #                     links.append(full_url)
+    #                 return links
+    #             else:
+    #                 st.error(f"Error: Received status code {response.status_code}")
+    #                 return []
 
-            except requests.exceptions.RequestException as e:
-                st.error(f"Error: Unable to fetch the URL. {e}")
-                return []
+    #         except requests.exceptions.RequestException as e:
+    #             st.error(f"Error: Unable to fetch the URL. {e}")
+    #             return []
 
-        # st.subheader("URL Extractor")
-        st.write("Enter a webpage URL to extract all the links from it.")
-        page_url = st.text_input("Enter the URL (e.g., https://pages.ebay.com/sitemap.html):", "")
+    #     # st.subheader("URL Extractor")
+    #     st.write("Enter a webpage URL to extract all the links from it.")
+    #     page_url = st.text_input("Enter the URL (e.g., https://pages.ebay.com/sitemap.html):", "")
 
-        if st.button("Extract URLs",key="extract_urls"):
-            if page_url:
-                if not page_url.startswith("http"):
-                    st.error("Please enter a valid URL starting with http or https.")
-                else:
-                    with st.spinner("Extracting links..."):
-                        links = extract_links(page_url)
+    #     if st.button("Extract URLs",key="extract_urls"):
+    #         if page_url:
+    #             if not page_url.startswith("http"):
+    #                 st.error("Please enter a valid URL starting with http or https.")
+    #             else:
+    #                 with st.spinner("Extracting links..."):
+    #                     links = extract_links(page_url)
 
-                        if links:
-                            st.success(f"Found {len(links)} links.")
-                            st.dataframe(pd.DataFrame(links, columns=["Links"]))
-                            csv_data = pd.DataFrame(links, columns=["Links"]).to_csv(index=False).encode('utf-8')
-                            st.download_button("Download Links as CSV", data=csv_data, file_name="extracted_links.csv", mime="text/csv")
-                        else:
-                            st.warning("No links found on the provided webpage.")
-            else:
-                st.error("Please enter a URL.")
+    #                     if links:
+    #                         st.success(f"Found {len(links)} links.")
+    #                         st.dataframe(pd.DataFrame(links, columns=["Links"]))
+    #                         csv_data = pd.DataFrame(links, columns=["Links"]).to_csv(index=False).encode('utf-8')
+    #                         st.download_button("Download Links as CSV", data=csv_data, file_name="extracted_links.csv", mime="text/csv")
+    #                     else:
+    #                         st.warning("No links found on the provided webpage.")
+    #         else:
+    #             st.error("Please enter a URL.")

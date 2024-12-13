@@ -8,7 +8,6 @@ import logging
 from urllib3.exceptions import InsecureRequestWarning
 import re
 
-# Disable warnings
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 # Streamlit and logging configuration
@@ -109,16 +108,15 @@ def convert_df_to_csv(download_data):
 def Home():
     st.header("Internal Linking Opportunities Finder", divider='rainbow')
 
-    # Check if filtered_df exists in session state
-    df = None  # Initialize the DataFrame variable
+    df = None
     if 'filtered_df' in st.session_state and st.session_state.filtered_df is not None:
         st.success("Using filtered data from the previous tab.")
         df = st.session_state.filtered_df
     else:
         # Fallback: ask user to upload a file if filtered_df isn't available
         uploaded_file = st.file_uploader("Upload CSV or Excel file with URLs",
-                                         type=["csv", "xlsx"],
-                                         key="url_file_uploader")
+                                        type=["csv", "xlsx"],
+                                        key="url_file_uploader")
         if uploaded_file:
             try:
                 if uploaded_file.name.endswith(".csv"):
@@ -140,8 +138,8 @@ def Home():
 
     with col2:
         target_url = st.text_input("Target URL for linking",
-                                   help="URL to suggest for internal linking",
-                                   key="target_url_input")
+                                help="URL to suggest for internal linking",
+                                key="target_url_input")
 
     max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=2,
                             help="Number of URLs to process simultaneously")
