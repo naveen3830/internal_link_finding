@@ -10,6 +10,7 @@ webdriver-manager
 urllib3
 aiohttp
 asyncio
+streamlit_authenticator
 beautifulsoup4
 lxml
 nest_asyncio

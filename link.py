@@ -10,7 +10,6 @@ import pandas as pd
 import re
 from urllib.parse import urlparse
 
-
 def link():
     st.header("URL Extractor",divider='rainbow')
     with st.container():

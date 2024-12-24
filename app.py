@@ -86,12 +86,8 @@ st.markdown(
     )
 
 
-# Sidebar menu
 with st.sidebar:
-    # Title with centered alignment
     st.markdown("<h2 style='text-align: center;'>Menu</h2>", unsafe_allow_html=True)
-
-    # Subtitle with centered alignment
     st.markdown("<h4 style='text-align: center;'>Navigate through the sections:</h4>", unsafe_allow_html=True)
     
     selected = option_menu(
@@ -102,7 +98,6 @@ with st.sidebar:
         menu_icon="cast"
     )
 
-# Load respective page based on user selection
 if selected == "URL Extractor":
     link()
 elif selected == "Keyword Analysis":
