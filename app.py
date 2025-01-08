@@ -12,7 +12,6 @@ from demo import Home
 from link import link
 import hashlib
 
-
 st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
 
 # AUTHORIZED_USERS = {
@@ -31,20 +30,17 @@ AUTHORIZED_USERS = {
 st.markdown(
         """
         <style>
-        /* Main container adjustments */
         
         .main {
             background-color: #222f3b;
             color: #d2d2d6;
         }
 
-        /* Title and headings styling */
         h1, h2, h3 {
             color: #1cb3e0;
             font-family: 'sans-serif';
         }
 
-        /* Button adjustments */
         .stButton>button {
             background-color: #1cb3e0;
             color: #ffffff;
@@ -57,14 +53,12 @@ st.markdown(
             background-color: #148bb5;
         }
 
-        /* Table styling */
         .stDataFrame {
             background-color: #344758;
             color: #d2d2d6;
             border: none;
         }
 
-        /* Sidebar tweaks */
         .sidebar .sidebar-content {
             background-color: #344758;
         }
@@ -72,7 +66,6 @@ st.markdown(
             color: #1cb3e0;
         }
 
-        /* Download button styling */
         .stDownloadButton>button {
             background-color: #1cb3e0;
             color: #ffffff;
@@ -84,7 +77,6 @@ st.markdown(
             background-color: #148bb5;
         }
 
-        /* Input field styling */
         input, textarea {
             background-color: #344758;
             color: #d2d2d6;
@@ -110,7 +102,6 @@ st.markdown(
             color: #1cb3e0 !important;
         }
         </style>
-
         """,
         unsafe_allow_html=True
     )
@@ -196,9 +187,7 @@ def authenticate_user():
             div.stAlert p {
                 color: #000000 !important;
             }
-            
             </style>
-            
         """, unsafe_allow_html=True)
         
         with st.container():
