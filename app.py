@@ -192,8 +192,10 @@ def authenticate_user():
         
         with st.container():
             st.markdown('<div style="text-align: center; margin-bottom: 2rem;"><h1 style="color: #1f2937;">Welcome Back</h1><p style="color: #4b5563;">Please sign in to continue</p></div>', unsafe_allow_html=True)
-            st.text_input(label="Username:", value="", key="user", on_change=creds_entered)
-            st.text_input(label="Password:", value="", key="passwd", type="password", on_change=creds_entered)
+            st.text_input(label="Username:", value="", key="user")
+            st.text_input(label="Password:", value="", key="passwd", type="password")
+            if st.button("Login", key="login"):
+                creds_entered()
         return False
     
     return True

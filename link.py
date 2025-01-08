@@ -170,46 +170,48 @@ def link():
                 pass
             return urls
         
-        st.write("Enter a website URL to fetch sitemap URLs.")
-        website_url = st.text_input("Website URL (e.g., https://example.com):", "")
+    st.write("Enter a website URL to fetch sitemap URLs.")
+    website_url = st.text_input("Website URL (e.g., https://example.com):", "")
 
-        if 'previous_url' not in st.session_state:
-            st.session_state.previous_url = ""
-        if 'all_urls' not in st.session_state:
-            st.session_state.all_urls = []
-        if 'language_results' not in st.session_state:
-            st.session_state.language_results = []
-        if 'lang_df' not in st.session_state:
-            st.session_state.lang_df = None
+    if 'previous_url' not in st.session_state:
+        st.session_state.previous_url = ""
+    if 'all_urls' not in st.session_state:
+        st.session_state.all_urls = []
+    if 'language_results' not in st.session_state:
+        st.session_state.language_results = []
+    if 'lang_df' not in st.session_state:
+        st.session_state.lang_df = None
 
-        if website_url and website_url != st.session_state.previous_url:
-            st.session_state.all_urls = []
-            st.session_state.language_results = []
-            st.session_state.lang_df = None
-            st.session_state.previous_url = website_url
+    if website_url and website_url != st.session_state.previous_url:
+        st.session_state.all_urls = []
+        st.session_state.language_results = []
+        st.session_state.lang_df = None
+        st.session_state.previous_url = website_url
 
-        if st.button("Extract URLs",key="extract_links") and website_url:
-            if not website_url.startswith("http"):
-                st.error("Please enter a valid URL starting with http or https.")
-            else:
-                if not st.session_state.all_urls:
-                    with st.spinner("Fetching sitemap..."):
-                        st.session_state.all_urls = fetch_sitemap_urls(website_url)
-                        if st.session_state.all_urls:
-                            st.success(f"Found {len(st.session_state.all_urls)} total URLs.")
-                            progress_bar = st.progress(0)
-                            st.session_state.language_results = []
-                            
-                            for i, url in enumerate(st.session_state.all_urls):
-                                progress_bar.progress(int((i + 1) / len(st.session_state.all_urls) * 100))
-                                url_lang = detect_url_language(url)
-                                st.session_state.language_results.append({
-                                    'source_url': url,
-                                    'Language': url_lang})
-                            progress_bar.empty()
-                            st.session_state.lang_df = pd.DataFrame(st.session_state.language_results)
-                        else:
-                            st.error("No sitemap or URLs found.")
+    if st.button("Extract URLs", key="extract_links"):
+        if not website_url:
+            st.warning("Please enter a website URL before extracting.")
+        elif not website_url.startswith("http"):
+            st.error("Please enter a valid URL starting with http or https.")
+        else:
+            if not st.session_state.all_urls:
+                with st.spinner("Fetching sitemap..."):
+                    st.session_state.all_urls = fetch_sitemap_urls(website_url)
+                    if st.session_state.all_urls:
+                        st.success(f"Found {len(st.session_state.all_urls)} total URLs.")
+                        progress_bar = st.progress(0)
+                        st.session_state.language_results = []
+                        
+                        for i, url in enumerate(st.session_state.all_urls):
+                            progress_bar.progress(int((i + 1) / len(st.session_state.all_urls) * 100))
+                            url_lang = detect_url_language(url)
+                            st.session_state.language_results.append({
+                                'source_url': url,
+                                'Language': url_lang})
+                        progress_bar.empty()
+                        st.session_state.lang_df = pd.DataFrame(st.session_state.language_results)
+                    else:
+                        st.error("No sitemap or URLs found.")
 
         if st.session_state.lang_df is not None:
             st.dataframe(st.session_state.lang_df)
