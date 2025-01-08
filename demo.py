@@ -123,7 +123,7 @@ def Home():
     keyword_inputs = []
     target_url_inputs = []
     
-    st.subheader("Keywords and Target URLs")
+    st.subheader("Keywords and Target URLs",divider='rainbow')
     num_pairs = st.number_input("Number of keyword-URL pairs", min_value=1, value=1)
     
     for i in range(num_pairs):

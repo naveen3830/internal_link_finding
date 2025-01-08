@@ -171,7 +171,7 @@ def link():
             return urls
         
     st.write("Enter a website URL to fetch sitemap URLs.")
-    website_url = st.text_input("Website URL (e.g., https://example.com):", "")
+    website_url = st.text_input("Website URL (e.g., https://www.example.com):", "")
 
     if 'previous_url' not in st.session_state:
         st.session_state.previous_url = ""
