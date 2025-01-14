@@ -201,9 +201,9 @@ def link():
 
     st.write("Enter a website URL to fetch sitemap URLs.")
     website_url = st.text_input(
-        "Website URL (e.g., https://www.example.com):",
+        "Enter Website URL Below:",
         key="website_url",
-        value=st.session_state.get('website_url', '')
+        value=st.session_state.get('website_url', ''),placeholder="https://www.example.com"
     )
 
     if st.button("Extract URLs", key="extract_links"):
@@ -261,8 +261,7 @@ def link():
                 mime="text/csv"
             )
                 
-                
-                
+
     # with tab2:
     #     def extract_links(url):
     #         try:

@@ -129,8 +129,7 @@ def Home():
     for i in range(num_pairs):
         col1, col2 = st.columns([3, 3])
         with col1:
-            keyword = st.text_input(f"Keyword {i+1}",
-                                key=f"keyword_input_{i}")
+            keyword = st.text_input(f"Keyword {i+1}",key=f"keyword_input_{i}")
             keyword_inputs.append(keyword)
         
         with col2:
