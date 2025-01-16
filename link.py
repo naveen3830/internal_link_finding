@@ -14,7 +14,6 @@ def link():
     st.header("URL Extractor",divider='rainbow')
     with st.container():
         st.write("""
-        This app is designed to help extract URLs from a given website or sitemap. It provides two main functionalities:
         *   **URL Extractor Using Sitemap**: This feature allows you to extract URLs from a website's sitemap.
     """)
     
@@ -24,14 +23,14 @@ def link():
             parsed_url = urlparse(url)
             path = parsed_url.path.lower()
             hostname = parsed_url.hostname.lower() if parsed_url.hostname else ''
+            
+            # Country-specific TLD mapping
             country_lang_map = {
                 '.cn': 'zh',    # China
                 '.jp': 'ja',    # Japan
                 '.kr': 'ko',    # Korea
                 '.tw': 'zh',    # Taiwan
                 '.hk': 'zh',    # Hong Kong
-                
-                # Country-specific TLDs for European languages
                 '.it': 'it',    # Italy
                 '.es': 'es',    # Spain
                 '.fr': 'fr',    # France
@@ -51,62 +50,75 @@ def link():
                 '.bg': 'bg',    # Bulgaria
                 '.sk': 'sk',    # Slovakia
                 '.si': 'sl'     # Slovenia 
-                }
+            }
             
+            # More specific language patterns with word boundaries
             language_patterns = {
-                # Major languages with more specific markers
-                'en': ['/en','/en/', '/en-', 'english', '/us/', '/uk/', '/au/', '/international/'],
-                'it': ['/it','/it/', '/it-', 'italiano', 'italian', '/ch/', '/teamviewer.com/it/'],
-                'es': ['/es','/es/', '/es-', 'espanol', 'spanish','/mx/', '/cl/', '/co/', '/latam/','teamviewer.com/latam/','https://www.teamviewer.com/latam/'],
-                'fr': ['/fr','/fr/', '/fr-', 'french', '/ca/', '/ch/', '/be/'],
-                'de': ['/de','/de/', '/de-', 'deutsch', 'german', '/at/', '/ch/'],
-                'pt': ['/pt','/pt/', '/pt-', 'portuguese', '/br/', '/pt/', '/ao/'],
-                'ru': ['/ru','/ru/', '/ru-', 'russian', '/by/', '/kz/'],
-                'nl': ['/nl','/nl/', '/nl-', 'dutch', '/netherlands/'],
-                'tw': ['/tw','/tw/', '/tw-', 'taiwanese', '/taiwan/'],
-                'vi': ['/vi','/vi/', '/vi-', 'vietnamese'],
-                'pl': ['/pl','/pl/', '/pl-', 'polish'],
-                'hu': ['/hu','/hu/', '/hu-', 'hungarian'],
-                'tr': ['/tr','/tr/', '/tr-', 'turkish'],
-                'th': ['/th','/th/', '/th-', 'thai'],
-                'cs': ['/cs','/cs/', '/cs-', 'czech'],
-                'el': ['/el','/el/','/el-','greek'],
-                
-                # Asian languages with more specific detection
-                'ja': ['/ja','/ja/', '/ja-', 'japanese', '/jp/', '/teamviewer.com/ja/'],
-                'zh': ['/zh','/zh/', '/zh-', '/zhs/','chinese','/cn/', '/hk/', '/tw/','/teamviewer.cn/', '/teamviewer.com.cn/','/zh-cn/', '/zh-tw/', '/zh-hk/','/zht/','/anydesk.com/zhs/'],
-                'ko': ['/ko','/ko/', '/ko-', 'korean', '/kr/'],
-                'ar': ['/ar','/ar/', '/ar-', 'arabic', '/sa/', '/ae/']}
+                'en': [r'/en/', r'/en-', r'/english/', r'/us/', r'/uk/', r'/au/', r'/international/'],
+                'it': [r'/it/', r'/it-', r'/italiano/', r'/italian/', r'/ch/'],
+                'es': [r'/es/', r'/es-', r'/espanol/', r'/spanish/', r'/mx/', r'/cl/', r'/co/', r'/latam/'],
+                'fr': [r'/fr/', r'/fr-', r'/french/', r'/ca/', r'/ch/', r'/be/'],
+                'de': [r'/de/', r'/de-', r'/deutsch/', r'/german/', r'/at/', r'/ch/'],
+                'pt': [r'/pt/', r'/pt-', r'/portuguese/', r'/br/', r'/pt/', r'/ao/'],
+                'ru': [r'/ru/', r'/ru-', r'/russian/', r'/by/', r'/kz/'],
+                'nl': [r'/nl/', r'/nl-', r'/dutch/', r'/netherlands/'],
+                'vi': [r'/vi/', r'/vi-', r'/vietnamese/'],
+                'pl': [r'/pl/', r'/pl-', r'/polish/'],
+                'hu': [r'/hu/', r'/hu-', r'/hungarian/'],
+                'tr': [r'/tr/', r'/tr-', r'/turkish/'],
+                'th': [r'/th/', r'/th-', r'/thai/'],
+                'cs': [r'/cs/', r'/cs-', r'/czech/'],
+                'el': [r'/el/', r'/el-', r'/greek/'],
+                'ja': [r'/ja/', r'/ja-', r'/japanese/', r'/jp/'],
+                'zh': [r'/zh/', r'/zh-', r'/zhs/', r'/chinese/', r'/cn/', r'/hk/', r'/tw/', r'/zh-cn/', r'/zh-tw/', r'/zh-hk/', r'/zht/'],
+                'ko': [r'/ko/', r'/ko-', r'/korean/', r'/kr/'],
+                'ar': [r'/ar/', r'/ar-', r'/arabic/', r'/sa/', r'/ae/']
+            }
             
+            # Check domain-specific patterns
+            specific_domain_patterns = {
+                'zh': [r'teamviewer\.cn', r'teamviewer\.com\.cn'],
+                'ja': [r'teamviewer\.com/ja'],
+                'it': [r'teamviewer\.com/it'],
+                'es': [r'teamviewer\.com/latam']
+            }
+            
+            # First check specific domain patterns
+            for lang, patterns in specific_domain_patterns.items():
+                if any(re.search(pattern, url, re.IGNORECASE) for pattern in patterns):
+                    return lang
+            
+            # Check TLD
             for domain_suffix, lang in country_lang_map.items():
                 if hostname.endswith(domain_suffix):
                     return lang
             
+            # Check language patterns with word boundaries
+            path_parts = path.split('/')
             for lang, patterns in language_patterns.items():
-                if f'.{lang}.' in hostname or f'/{lang}/' in path or f'/{lang}-' in path:
-                    return lang
-            
-            for lang, patterns in language_patterns.items():
-                if any(pattern in hostname or pattern in path for pattern in patterns):
-                    return lang
-            
-            if parsed_url.query:
-                for lang in language_patterns.keys():
-                    if re.search(fr'lang[=_]({lang}|{lang.upper()})', parsed_url.query, re.IGNORECASE):
+                for pattern in patterns:
+                    # Remove leading/trailing slashes and create a clean pattern
+                    clean_pattern = pattern.strip('/')
+                    if clean_pattern in path_parts:
                         return lang
-
-            teamviewer_lang_map = {'it': ['teamviewer.com/it/'],'ja': ['teamviewer.com/ja/'],'zh': ['teamviewer.cn/', 'teamviewer.com.cn/', '/cn/','/anydesk.com/zhs/solutions/'],'es': ['teamviewer.com/latam/']}
             
-            for lang, patterns in teamviewer_lang_map.items():
-                if any(pattern in url for pattern in patterns):
+            # Check query parameters for language
+            if parsed_url.query:
+                lang_param = re.search(r'(?:^|&)lang=([a-zA-Z]{2})', parsed_url.query)
+                if lang_param and lang_param.group(1).lower() in language_patterns:
+                    return lang_param.group(1).lower()
+            
+            # Additional checks for specific product paths
+            product_lang_patterns = {
+                'es': [r'/distribucion-de-licencias-tensor'],
+                'zh': [r'/anydesk\.com/zhs/solutions/']
+            }
+            
+            for lang, patterns in product_lang_patterns.items():
+                if any(re.search(pattern, url, re.IGNORECASE) for pattern in patterns):
                     return lang
             
-            additional_lang_patterns = {'it': r'/it[\-_/]','ja': r'/ja[\-_/]','zh': r'/zh[\-_/]|/cn[\-_/]','ko': r'/ko[\-_/]',
-            'es': r'/es[\-_/]|/latam[\-_/]|/distribucion-de-licencias-tensor'}
-            
-            for lang, pattern in additional_lang_patterns.items():
-                if re.search(pattern, url, re.IGNORECASE):
-                    return lang
+            # Default to English if no other language is detected
             return 'en'
 
         def fetch_sitemap_urls(website_url):
@@ -171,7 +183,7 @@ def link():
             return urls
         
         st.write("Enter a website URL to fetch sitemap URLs.")
-        website_url = st.text_input("Website URL (e.g., https://example.com):", "")
+        website_url = st.text_input("Website URL", placeholder="https://www.example.com")
 
         if 'previous_url' not in st.session_state:
             st.session_state.previous_url = ""
@@ -231,6 +243,8 @@ def link():
             filtered_urls = filtered_df[['source_url']].rename(columns={'source_url': 'source_url'})
             csv_data = filtered_urls.to_csv(index=False).encode('utf-8')
             st.download_button(label="Download Filtered URLs",data=csv_data,file_name="filtered_urls.csv",mime="text/csv")
+
+
                 
     # with tab2:
     #     def extract_links(url):

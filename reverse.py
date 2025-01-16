@@ -7,7 +7,6 @@ from urllib.parse import urljoin, urlparse
 import numpy as np
 
 def is_valid_url(url):
-    """Validate if the given string is a proper URL."""
     try:
         result = urlparse(url)
         return all([result.scheme, result.netloc])
@@ -76,9 +75,9 @@ def analyze_internal_links():
     
     col1, col2 = st.columns(2)
     with col1:
-        homepage_url = st.text_input("Homepage URL", placeholder="https://example.com")
+        homepage_url = st.text_input("Homepage URL", placeholder="https://www.example.com")
     with col2:
-        target_page_url = st.text_input("Target Page URL", placeholder="https://example.com/target")
+        target_page_url = st.text_input("Target Page URL", placeholder="https://www.example.com/target")
     
     # Number of blog pages
     num_blogs = st.number_input("Number of Blog Pages to Analyze", min_value=1, max_value=10, value=3)
@@ -86,7 +85,7 @@ def analyze_internal_links():
     # Blog URLs input
     blog_urls = []
     for i in range(num_blogs):
-        blog_url = st.text_input(f"Blog {i+1} URL", placeholder=f"https://example.com/blog-{i+1}")
+        blog_url = st.text_input(f"Blog {i+1} URL", placeholder=f"https://www.example.com/blog-{i+1}")
         if blog_url:
             blog_urls.append(blog_url)
     

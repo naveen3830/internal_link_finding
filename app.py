@@ -208,7 +208,7 @@ def main():
             selected = option_menu(
                 'Main Menu',
                 ['URL Extractor', 'Keyword Analysis','Reverse Silos'],
-                icons=['house', 'list-check','list-check'],
+                icons=['house', 'list-check','crosshair'],
                 default_index=0,
                 menu_icon="cast"
             )
