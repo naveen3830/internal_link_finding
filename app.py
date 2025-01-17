@@ -1,5 +1,4 @@
 import streamlit as st
-from bs4 import BeautifulSoup
 from streamlit_option_menu import option_menu
 from demo import Home
 from link import link

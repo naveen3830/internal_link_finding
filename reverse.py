@@ -13,7 +13,7 @@ def is_valid_url(url):
     except:
         return False
 
-def get_main_content_anchor_tags(url):
+def get_main_content_anchor_tags(url, page_type):
     """Scrape anchor tags from the main content area of a given URL."""
     try:
         headers = {
@@ -61,8 +61,10 @@ def get_main_content_anchor_tags(url):
                 # Only include links from the same domain
                 if urlparse(absolute_url).netloc == urlparse(url).netloc:
                     links.append({
+                        'page_source': page_type,  # Add the source page type
                         'text': text,
-                        'url': absolute_url
+                        'url': absolute_url,
+                        'source': 'Main Content'
                     })
         
         return links
@@ -97,7 +99,7 @@ def analyze_internal_links():
     
     # Create DataFrame with the input URLs
     data = pd.DataFrame({
-        'title': ['Homepage', 'Target Page'] + [f'Blog {i+1}' for i in range(len(blog_urls))],
+        'type': ['Homepage', 'Target Page'] + [f'Blog {i+1}' for i in range(len(blog_urls))],
         'url': [homepage_url, target_page_url] + blog_urls
     })
     
@@ -113,26 +115,28 @@ def analyze_internal_links():
         
         # Scrape links from each page
         for idx, row in data.iterrows():
-            status_text.text(f"Analyzing {row['title']}...")
+            status_text.text(f"Analyzing {row['type']}...")
             progress_bar.progress((idx + 1) / len(data))
             
-            page_links = get_main_content_anchor_tags(row['url'])
-            all_links[row['title']] = page_links
+            page_links = get_main_content_anchor_tags(row['url'], row['type'])
+            all_links[row['type']] = page_links
         
         # Create interlinking matrix
         matrix_data = np.zeros((len(data), len(data)))
         
         for i, source_row in data.iterrows():
-            source_links = all_links[source_row['title']]
+            source_links = all_links[source_row['type']]
             for j, target_row in data.iterrows():
-                if any(link['url'] == target_row['url'] for link in source_links):
-                    matrix_data[i][j] = 1
+                # Skip self-linking (diagonal elements)
+                if i != j:
+                    if any(link['url'] == target_row['url'] for link in source_links):
+                        matrix_data[i][j] = 1
         
         # Create interlinking matrix DataFrame
         matrix_df = pd.DataFrame(
             matrix_data,
-            columns=data['title'],
-            index=data['title']
+            columns=data['type'],
+            index=data['type']
         )
         
         st.divider()
@@ -149,7 +153,7 @@ def analyze_internal_links():
             target_links = homepage_links_df[homepage_links_df['url'] == target_page_url]
             if not target_links.empty:
                 st.write("Links found:")
-                st.dataframe(target_links)
+                st.dataframe(target_links[['page_source', 'text', 'url', 'source']])
         else:
             st.error("✗ Homepage does not link to Target Page")
             
@@ -159,21 +163,20 @@ def analyze_internal_links():
             home_links = target_links_df[target_links_df['url'] == homepage_url]
             if not home_links.empty:
                 st.write("Links found:")
-                st.dataframe(home_links)
+                st.dataframe(home_links[['page_source', 'text', 'url', 'source']])
         else:
             st.error("✗ Target Page does not link to Homepage")
 
         st.divider()
         st.write("### Blog Interlinking Analysis")
-        blog_columns = [f'Blog {i+1}' for i in range(len(blog_urls))]
         
-        for blog in blog_columns:
-            st.write(f"\n**{blog} Analysis:**")
+        for blog_idx, blog_type in enumerate(data['type'][2:], 1):  # Skip Homepage and Target Page
+            st.write(f"\n**{blog_type} Analysis:**")
             
             # Create a DataFrame for all links from this blog
-            blog_links_df = pd.DataFrame(all_links[blog])
+            blog_links_df = pd.DataFrame(all_links[blog_type])
             if blog_links_df.empty:
-                st.warning(f"No internal links found in {blog}")
+                st.warning(f"No internal links found in {blog_type}")
                 continue
                 
             # Check and display target page links
@@ -181,19 +184,19 @@ def analyze_internal_links():
             if not target_links.empty:
                 st.success(f"✓ Links to Target Page")
                 st.write("Target Page Links:")
-                st.dataframe(target_links)
+                st.dataframe(target_links[['page_source', 'text', 'url', 'source']])
             else:
                 st.error(f"✗ Does not link to Target Page")
             
             # Check and display links to other blogs
-            other_blogs = [b for b in blog_columns if b != blog]
-            other_blog_urls = [blog_urls[blog_columns.index(b)] for b in other_blogs]
+            other_blogs = [b for b in data['type'][2:] if b != blog_type]  # Skip Homepage and Target Page
+            other_blog_urls = data[data['type'].isin(other_blogs)]['url'].tolist()
             
             # Create a DataFrame for links to other blogs
             other_blog_links = blog_links_df[blog_links_df['url'].isin(other_blog_urls)]
             if not other_blog_links.empty:
                 st.write("Links to Other Blogs:")
-                st.dataframe(other_blog_links)
+                st.dataframe(other_blog_links[['page_source', 'text', 'url', 'source']])
             
             # Show missing blog links
             linked_urls = other_blog_links['url'].tolist()
@@ -203,7 +206,7 @@ def analyze_internal_links():
         
         st.divider()
         st.write("### Complete Interlinking Matrix")
-        st.write("1 indicates a link exists, 0 indicates no link")
+        st.write("1 indicates a link exists, 0 indicates no link (diagonal shows no self-linking)")
         st.dataframe(matrix_df)
         
         # Reset progress
