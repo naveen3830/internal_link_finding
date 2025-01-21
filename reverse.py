@@ -61,10 +61,8 @@ def get_main_content_anchor_tags(url, page_type):
                 # Only include links from the same domain
                 if urlparse(absolute_url).netloc == urlparse(url).netloc:
                     links.append({
-                        'page_source': page_type,  # Add the source page type
                         'text': text,
-                        'url': absolute_url,
-                        'source': 'Main Content'
+                        'url': absolute_url
                     })
         
         return links
@@ -113,6 +111,9 @@ def analyze_internal_links():
         # Dictionary to store all links for each page
         all_links = {}
         
+        # Create URL to type mapping for later use
+        url_to_type = dict(zip(data['url'], data['type']))
+        
         # Scrape links from each page
         for idx, row in data.iterrows():
             status_text.text(f"Analyzing {row['type']}...")
@@ -127,7 +128,6 @@ def analyze_internal_links():
         for i, source_row in data.iterrows():
             source_links = all_links[source_row['type']]
             for j, target_row in data.iterrows():
-                # Skip self-linking (diagonal elements)
                 if i != j:
                     if any(link['url'] == target_row['url'] for link in source_links):
                         matrix_data[i][j] = 1
@@ -153,7 +153,8 @@ def analyze_internal_links():
             target_links = homepage_links_df[homepage_links_df['url'] == target_page_url]
             if not target_links.empty:
                 st.write("Links found:")
-                st.dataframe(target_links[['page_source', 'text', 'url', 'source']])
+                # Update source_page to show target type
+                st.dataframe(target_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
         else:
             st.error("✗ Homepage does not link to Target Page")
             
@@ -163,7 +164,7 @@ def analyze_internal_links():
             home_links = target_links_df[target_links_df['url'] == homepage_url]
             if not home_links.empty:
                 st.write("Links found:")
-                st.dataframe(home_links[['page_source', 'text', 'url', 'source']])
+                st.dataframe(home_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
         else:
             st.error("✗ Target Page does not link to Homepage")
 
@@ -184,7 +185,7 @@ def analyze_internal_links():
             if not target_links.empty:
                 st.success(f"✓ Links to Target Page")
                 st.write("Target Page Links:")
-                st.dataframe(target_links[['page_source', 'text', 'url', 'source']])
+                st.dataframe(target_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
             else:
                 st.error(f"✗ Does not link to Target Page")
             
@@ -196,7 +197,7 @@ def analyze_internal_links():
             other_blog_links = blog_links_df[blog_links_df['url'].isin(other_blog_urls)]
             if not other_blog_links.empty:
                 st.write("Links to Other Blogs:")
-                st.dataframe(other_blog_links[['page_source', 'text', 'url', 'source']])
+                st.dataframe(other_blog_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
             
             # Show missing blog links
             linked_urls = other_blog_links['url'].tolist()
@@ -212,6 +213,6 @@ def analyze_internal_links():
         # Reset progress
         progress_bar.empty()
         status_text.empty()
-        
+
 # if __name__ == "__main__":
 #     analyze_internal_links()

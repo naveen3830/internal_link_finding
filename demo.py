@@ -219,6 +219,5 @@ def Home():
         else:
             st.warning("Please provide all inputs and ensure valid data is available.")
             
-            
     # if __name__ == "__main__":
     #     main()

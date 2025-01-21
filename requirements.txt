@@ -1,6 +1,8 @@
 openpyxl
 scrapy
 futures
+asyncio
+aiohttp
 selenium
 pandas
 streamlit
