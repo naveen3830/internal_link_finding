@@ -1,4 +1,3 @@
-# Updated code to address the discrepancy
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -32,11 +31,11 @@ def get_main_content_anchor_tags(url, page_type):
                                     '[role="contentinfo"]']):
             element.decompose()
         
-        # NEW CODE ADDED HERE: Remove elements with the class from the image
+        # Remove elements with specific class
         for element in soup.find_all(attrs={"class": ["d-none d-sm-flex align-items-center"]}):
             element.decompose()
         
-        # Try to find main content area using common selectors
+        # Find main content area
         main_content = None
         content_selectors = ['main', 'article', '#content', '.content', 
                         '#main', '.main', '[role="main"]']
@@ -46,7 +45,6 @@ def get_main_content_anchor_tags(url, page_type):
             if main_content:
                 break
         
-        # If no main content area found, use the body after cleaning
         if not main_content:
             main_content = soup.body
         
@@ -54,15 +52,13 @@ def get_main_content_anchor_tags(url, page_type):
         if main_content:
             for link in main_content.find_all('a', href=True):
                 href = link.get('href')
-                text = ' '.join(link.get_text().strip().split())  # Normalize whitespace
+                text = ' '.join(link.get_text().strip().split())
                 
                 if not text or text.isspace():
                     continue
                 
-                # Convert relative URLs to absolute URLs
                 absolute_url = urljoin(url, href)
                 
-                # Only include links from the same domain
                 if urlparse(absolute_url).netloc == urlparse(url).netloc:
                     links.append({
                         'text': text,
@@ -83,23 +79,19 @@ def analyze_internal_links():
     with col2:
         target_page_url = st.text_input("Target Page URL", placeholder="https://www.example.com/target")
     
-    # Number of blog pages
     num_blogs = st.number_input("Number of Blog Pages to Analyze", min_value=1, max_value=10, value=3)
     
-    # Blog URLs input
     blog_urls = []
     for i in range(num_blogs):
         blog_url = st.text_input(f"Blog {i+1} URL", placeholder=f"https://www.example.com/blog-{i+1}")
         if blog_url:
             blog_urls.append(blog_url)
     
-    # Validate inputs before proceeding
     all_urls = [homepage_url, target_page_url] + blog_urls
     if not all(all_urls) or not all(is_valid_url(url) for url in all_urls):
         st.warning("Please enter valid URLs for all fields")
         return
     
-    # Create DataFrame with the input URLs
     data = pd.DataFrame({
         'type': ['Homepage', 'Target Page'] + [f'Blog {i+1}' for i in range(len(blog_urls))],
         'url': [homepage_url, target_page_url] + blog_urls
@@ -108,21 +100,15 @@ def analyze_internal_links():
     if st.button("Start Analysis"):
         st.write("Analyzing pages:", data)
         
-        # Create progress bar
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        # Dictionary to store all links for each page
         all_links = {}
-        
-        # Create URL to type mapping for later use
         url_to_type = dict(zip(data['url'], data['type']))
         
-        # Scrape links from each page
         for idx, row in data.iterrows():
             status_text.text(f"Analyzing {row['type']}...")
             progress_bar.progress((idx + 1) / len(data))
-            
             page_links = get_main_content_anchor_tags(row['url'], row['type'])
             all_links[row['type']] = page_links
         
@@ -133,22 +119,21 @@ def analyze_internal_links():
             source_links = all_links[source_row['type']]
             for j, target_row in data.iterrows():
                 if i != j:
-                    if any(link['url'] == target_row['url'] for link in source_links if link['url'] != homepage_url):
+                    if any(link['url'] == target_row['url'] for link in source_links):
                         matrix_data[i][j] = 1
         
-        # Create interlinking matrix DataFrame
         matrix_df = pd.DataFrame(
             matrix_data,
-            columns=data['type'],
-            index=data['type']
-        )
-        
-        # Remove index and column names
-        matrix_df.index.name = None
-        matrix_df.columns.name = None
+            columns=data['type'],  # Column headers = page types
+            index=data['type']     # Row labels = page types
+        ).rename_axis(None, axis=1).rename_axis(None, axis=0)  # Remove index/column names
         
         # Set diagonal to NA
         np.fill_diagonal(matrix_df.values, np.nan)
+        
+        # Set 0 to NA for Blog -> Homepage links
+        blog_types = [typ for typ in matrix_df.index if typ.startswith('Blog')]
+        matrix_df.loc[blog_types, 'Homepage'] = matrix_df.loc[blog_types, 'Homepage'].replace(0, np.nan)
         
         # Create tooltip data
         tooltip_data = []
@@ -160,7 +145,7 @@ def analyze_internal_links():
                 else:
                     target_url = data[data['type'] == target_type]['url'].values[0]
                     source_links = all_links.get(source_type, [])
-                    matching_links = [link for link in source_links if link['url'] == target_url and link['url'] != homepage_url]
+                    matching_links = [link for link in source_links if link['url'] == target_url]
                     
                     tooltip_content = []
                     for link in matching_links:
@@ -170,42 +155,61 @@ def analyze_internal_links():
         
         tooltip_df = pd.DataFrame(tooltip_data, index=matrix_df.index, columns=matrix_df.columns)
         
-          # Configure tooltip style
         tooltip_style = [
             ('visibility', 'hidden'),
             ('position', 'absolute'),
             ('z-index', '100'),
-            ('background-color', 'white'),
-            ('color', 'black'),  # Added text color
-            ('border', '1px solid #cccccc'),
-            ('padding', '8px'),
-            ('font-family', 'sans-serif'),
-            ('font-size', '12px'),
-            ('box-shadow', '2px 2px 5px rgba(0, 0, 0, 0.1)')
+            ('background-color', st.get_option("theme.secondaryBackgroundColor")),
+            ('color', st.get_option("theme.textColor")),
+            ('border', f'2px solid {st.get_option("theme.primaryColor")}'),
+            ('padding', '10px'),
+            ('font-family', st.get_option("theme.font")),
+            ('font-size', '13px'),
+            ('box-shadow', '3px 3px 8px rgba(0, 0, 0, 0.5)'),
+            ('border-radius', '5px')
         ]
-        
-        # Custom color function for the matrix
+                
         def color_cells(val):
+            # Use high-contrast colors with explicit text colors
             if val == 1:
-                return 'background-color: #90EE90'  # Light green
+                return 'background-color: #90EE90; color: black'  # Light green with dark text
             elif val == 0:
-                return 'background-color: #FFCCCB'  # Light red
-            return ''
-        
-        # Create styled matrix
+                return 'background-color: #FF6B6B; color: white'  # Red with white text
+            return f'background-color: {st.get_option("theme.secondaryBackgroundColor")}; color: {st.get_option("theme.textColor")}'
+
+        # Update the styled matrix configuration
         styled_matrix = (matrix_df
-                         .style
-                         .set_tooltips(tooltip_df, props=tooltip_style)
-                         .format(na_rep="NA", precision=0)
-                         .set_properties(**{'text-align': 'center', 
-                                          'min-width': '150px',
-                                          'font-weight': 'bold'})
-                         .applymap(color_cells))
-        
+                        .style
+                        .set_tooltips(tooltip_df, props=tooltip_style)
+                        .format(na_rep="NA", precision=0)
+                        .set_properties(**{
+                            'text-align': 'center',
+                            'min-width': '150px',
+                            'font-weight': 'bold',
+                            'background-color': st.get_option("theme.backgroundColor"),
+                            'color': st.get_option("theme.textColor"),
+                            'border': f'1px solid {st.get_option("theme.primaryColor")}',
+                            'font-family': st.get_option("theme.font")
+                        })
+                        .applymap(color_cells)
+                        .set_table_styles([{
+                            'selector': 'th, td',
+                            'props': [
+                                ('border', f'1px solid {st.get_option("theme.primaryColor")}'),
+                                ('padding', '8px 12px')
+                            ]
+                        }, {
+                            'selector': 'th',
+                            'props': [
+                                ('background-color', st.get_option("theme.secondaryBackgroundColor")),
+                                ('color', st.get_option("theme.primaryColor")),
+                                ('font-weight', 'bold')
+                            ]
+                        }]))
+
         st.divider()
         st.subheader("Detailed Link Analysis")
         
-        # Check Homepage <-> Target Page linking
         st.write("### Homepage and Target Page Interlinking")
         home_to_target = matrix_df.loc['Homepage', 'Target Page'] == 1
         target_to_home = matrix_df.loc['Target Page', 'Homepage'] == 1
@@ -236,13 +240,11 @@ def analyze_internal_links():
         for blog_idx, blog_type in enumerate(data['type'][2:], 1):
             st.write(f"\n**{blog_type} Analysis:**")
             
-            # Create a DataFrame for all links from this blog
             blog_links_df = pd.DataFrame(all_links[blog_type])
             if blog_links_df.empty:
                 st.warning(f"No internal links found in {blog_type}")
                 continue
                 
-            # Check and display homepage links (excluding the common "Home" link)
             home_links = blog_links_df[blog_links_df['url'] == homepage_url]
             if not home_links.empty:
                 st.success("✓ Links to Homepage")
@@ -251,7 +253,6 @@ def analyze_internal_links():
             else:
                 st.error("✗ Does not link to Homepage")
             
-            # Check and display target page links
             target_links = blog_links_df[blog_links_df['url'] == target_page_url]
             if not target_links.empty:
                 st.success("✓ Links to Target Page")
@@ -260,17 +261,14 @@ def analyze_internal_links():
             else:
                 st.error("✗ Does not link to Target Page")
             
-            # Check and display links to other blogs
             other_blogs = [b for b in data['type'][2:] if b != blog_type]
             other_blog_urls = data[data['type'].isin(other_blogs)]['url'].tolist()
             
-            # Create a DataFrame for links to other blogs
-            other_blog_links = blog_links_df[blog_links_df['url'].isin(other_blog_urls) & (blog_links_df['url'] != homepage_url)]
+            other_blog_links = blog_links_df[blog_links_df['url'].isin(other_blog_urls)]
             if not other_blog_links.empty:
                 st.write("Links to Other Blogs:")
                 st.dataframe(other_blog_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
             
-            # Show missing blog links
             linked_urls = other_blog_links['url'].tolist()
             missing_blogs = [b for b, url in zip(other_blogs, other_blog_urls) if url not in linked_urls]
             if missing_blogs:
@@ -278,11 +276,8 @@ def analyze_internal_links():
         
         st.divider()
         st.write("### Complete Interlinking Matrix")
-        st.write("1 indicates a link exists, 0 indicates no link, and NA indicates no self-linking")
-
-        # Display styled matrix
+        st.write("1 indicates a link exists, 0 indicates no link, and NA indicates not applicable (self-link).")
         st.markdown(styled_matrix.to_html(), unsafe_allow_html=True)
         
-        # Reset progress
         progress_bar.empty()
         status_text.empty()

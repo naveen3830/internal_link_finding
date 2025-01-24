@@ -129,23 +129,22 @@ def Home():
     for i in range(num_pairs):
         col1, col2 = st.columns([3, 3])
         with col1:
-            keyword = st.text_input(f"Keyword {i+1}",
-                                  key=f"keyword_input_{i}")
+            keyword = st.text_input(f"Keyword {i+1}",key=f"keyword_input_{i}")
             keyword_inputs.append(keyword)
         
         with col2:
             target_url = st.text_input(f"Target URL {i+1}",
-                                     key=f"target_url_input_{i}")
+                                    key=f"target_url_input_{i}")
             target_url_inputs.append(target_url)
 
     max_workers = st.slider("Concurrent searches", min_value=1, max_value=15, value=15,
-                          help="Number of URLs to process simultaneously")
+                        help="Number of URLs to process simultaneously")
 
     if st.button("Process"):
         # Create keyword-URL pairs, filtering out empty inputs
         keyword_url_pairs = [(k.strip(), u.strip()) 
-                           for k, u in zip(keyword_inputs, target_url_inputs) 
-                           if k.strip() and u.strip()]
+                        for k, u in zip(keyword_inputs, target_url_inputs) 
+                        if k.strip() and u.strip()]
         
         if df is not None and keyword_url_pairs:
             try:
@@ -219,3 +218,6 @@ def Home():
                 st.error(f"An error occurred: {str(e)}")
         else:
             st.warning("Please provide all inputs and ensure valid data is available.")
+            
+    # if __name__ == "__main__":
+    #     main()
