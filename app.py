@@ -1,9 +1,9 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
-from demo import Home
-from link import link
+from opportunities_finder import Home
+from url_extractor import link
 import hashlib
-from reverse import analyze_internal_links
+from reverse_silos import analyze_internal_links
 
 st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
 
