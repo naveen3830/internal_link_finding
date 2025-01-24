@@ -23,7 +23,7 @@ def get_main_content_anchor_tags(url, page_type):
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Remove common non-main content elements
+        # Remove non-main content elements
         for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 
                                     'meta', 'link', 'sidebar', 'aside', '.nav', 
                                     '.header', '.footer', '.sidebar', '.menu',
@@ -31,11 +31,9 @@ def get_main_content_anchor_tags(url, page_type):
                                     '[role="contentinfo"]']):
             element.decompose()
         
-        # Remove elements with specific class
         for element in soup.find_all(attrs={"class": ["d-none d-sm-flex align-items-center"]}):
             element.decompose()
-        
-        # Find main content area
+
         main_content = None
         content_selectors = ['main', 'article', '#content', '.content', 
                         '#main', '.main', '[role="main"]']
@@ -112,7 +110,7 @@ def analyze_internal_links():
             page_links = get_main_content_anchor_tags(row['url'], row['type'])
             all_links[row['type']] = page_links
         
-        # Create interlinking matrix
+        # Create matrix
         matrix_data = np.zeros((len(data), len(data)))
         
         for i, source_row in data.iterrows():
@@ -124,18 +122,15 @@ def analyze_internal_links():
         
         matrix_df = pd.DataFrame(
             matrix_data,
-            columns=data['type'],  # Column headers = page types
-            index=data['type']     # Row labels = page types
-        ).rename_axis(None, axis=1).rename_axis(None, axis=0)  # Remove index/column names
+            columns=data['type'],
+            index=data['type']
+        ).rename_axis(None, axis=1).rename_axis(None, axis=0)
         
-        # Set diagonal to NA
         np.fill_diagonal(matrix_df.values, np.nan)
-        
-        # Set 0 to NA for Blog -> Homepage links
         blog_types = [typ for typ in matrix_df.index if typ.startswith('Blog')]
         matrix_df.loc[blog_types, 'Homepage'] = matrix_df.loc[blog_types, 'Homepage'].replace(0, np.nan)
         
-        # Create tooltip data
+        # Tooltips
         tooltip_data = []
         for i, source_type in enumerate(matrix_df.index):
             tooltip_row = []
@@ -155,6 +150,7 @@ def analyze_internal_links():
         
         tooltip_df = pd.DataFrame(tooltip_data, index=matrix_df.index, columns=matrix_df.columns)
         
+        # Styling
         tooltip_style = [
             ('visibility', 'hidden'),
             ('position', 'absolute'),
@@ -168,16 +164,14 @@ def analyze_internal_links():
             ('box-shadow', '3px 3px 8px rgba(0, 0, 0, 0.5)'),
             ('border-radius', '5px')
         ]
-                
+        
         def color_cells(val):
-            # Use high-contrast colors with explicit text colors
             if val == 1:
-                return 'background-color: #90EE90; color: black'  # Light green with dark text
+                return 'background-color: #90EE90; color: black'
             elif val == 0:
-                return 'background-color: #FF6B6B; color: white'  # Red with white text
+                return 'background-color: #FF6B6B; color: white'
             return f'background-color: {st.get_option("theme.secondaryBackgroundColor")}; color: {st.get_option("theme.textColor")}'
 
-        # Update the styled matrix configuration
         styled_matrix = (matrix_df
                         .style
                         .set_tooltips(tooltip_df, props=tooltip_style)
@@ -208,75 +202,73 @@ def analyze_internal_links():
                         }]))
 
         st.divider()
-        st.subheader("Detailed Link Analysis")
-        
-        st.write("### Homepage and Target Page Interlinking")
-        home_to_target = matrix_df.loc['Homepage', 'Target Page'] == 1
-        target_to_home = matrix_df.loc['Target Page', 'Homepage'] == 1
-        
-        if home_to_target:
-            st.success("✓ Homepage links to Target Page")
-            homepage_links_df = pd.DataFrame(all_links['Homepage'])
-            target_links = homepage_links_df[homepage_links_df['url'] == target_page_url]
-            if not target_links.empty:
-                st.write("Links found:")
-                st.dataframe(target_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
-        else:
-            st.error("✗ Homepage does not link to Target Page")
+        with st.expander("Homepage & Target Page Links", expanded=False):
+            st.write("### Homepage and Target Page Interlinking")
+            home_to_target = matrix_df.loc['Homepage', 'Target Page'] == 1
+            target_to_home = matrix_df.loc['Target Page', 'Homepage'] == 1
             
-        if target_to_home:
-            st.success("✓ Target Page links to Homepage")
-            target_links_df = pd.DataFrame(all_links['Target Page'])
-            home_links = target_links_df[target_links_df['url'] == homepage_url]
-            if not home_links.empty:
-                st.write("Links found:")
-                st.dataframe(home_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
-        else:
-            st.error("✗ Target Page does not link to Homepage")
+            if home_to_target:
+                st.success("✓ Homepage links to Target Page")
+                homepage_links_df = pd.DataFrame(all_links['Homepage'])
+                target_links = homepage_links_df[homepage_links_df['url'] == target_page_url]
+                if not target_links.empty:
+                    st.write("Links found:")
+                    st.dataframe(target_links[['text', 'url']])
+            else:
+                st.error("✗ Homepage does not link to Target Page")
+                
+            if target_to_home:
+                st.success("✓ Target Page links to Homepage")
+                target_links_df = pd.DataFrame(all_links['Target Page'])
+                home_links = target_links_df[target_links_df['url'] == homepage_url]
+                if not home_links.empty:
+                    st.write("Links found:")
+                    st.dataframe(home_links[['text', 'url']])
+            else:
+                st.error("✗ Target Page does not link to Homepage")
+
+        with st.expander("Blog Interlinking Details", expanded=False):
+            st.write("### Blog Interlinking Analysis")
+            
+            for blog_type in data['type'][2:]:
+                st.write(f"\n**{blog_type} Analysis:**")
+                
+                blog_links_df = pd.DataFrame(all_links[blog_type])
+                if blog_links_df.empty:
+                    st.warning(f"No internal links found in {blog_type}")
+                    continue
+                    
+                # Homepage links
+                home_links = blog_links_df[blog_links_df['url'] == homepage_url]
+                if not home_links.empty:
+                    st.success("✓ Links to Homepage")
+                    st.dataframe(home_links[['text', 'url']])
+                else:
+                    st.error("✗ Does not link to Homepage")
+                
+                target_links = blog_links_df[blog_links_df['url'] == target_page_url]
+                if not target_links.empty:
+                    st.success("✓ Links to Target Page")
+                    st.dataframe(target_links[['text', 'url']])
+                else:
+                    st.error("✗ Does not link to Target Page")
+                
+                other_blogs = [b for b in data['type'][2:] if b != blog_type]
+                other_blog_urls = data[data['type'].isin(other_blogs)]['url'].tolist()
+                other_blog_links = blog_links_df[blog_links_df['url'].isin(other_blog_urls)]
+                
+                if not other_blog_links.empty:
+                    st.write("Links to Other Blogs:")
+                    st.dataframe(other_blog_links[['text', 'url']])
+                
+                missing_blogs = [b for b, url in zip(other_blogs, other_blog_urls) 
+                               if url not in other_blog_links['url'].tolist()]
+                if missing_blogs:
+                    st.error(f"Missing links to: {', '.join(missing_blogs)}")
 
         st.divider()
-        st.write("### Blog Interlinking Analysis")
-        
-        for blog_idx, blog_type in enumerate(data['type'][2:], 1):
-            st.write(f"\n**{blog_type} Analysis:**")
-            
-            blog_links_df = pd.DataFrame(all_links[blog_type])
-            if blog_links_df.empty:
-                st.warning(f"No internal links found in {blog_type}")
-                continue
-                
-            home_links = blog_links_df[blog_links_df['url'] == homepage_url]
-            if not home_links.empty:
-                st.success("✓ Links to Homepage")
-                st.write("Homepage Links:")
-                st.dataframe(home_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
-            else:
-                st.error("✗ Does not link to Homepage")
-            
-            target_links = blog_links_df[blog_links_df['url'] == target_page_url]
-            if not target_links.empty:
-                st.success("✓ Links to Target Page")
-                st.write("Target Page Links:")
-                st.dataframe(target_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
-            else:
-                st.error("✗ Does not link to Target Page")
-            
-            other_blogs = [b for b in data['type'][2:] if b != blog_type]
-            other_blog_urls = data[data['type'].isin(other_blogs)]['url'].tolist()
-            
-            other_blog_links = blog_links_df[blog_links_df['url'].isin(other_blog_urls)]
-            if not other_blog_links.empty:
-                st.write("Links to Other Blogs:")
-                st.dataframe(other_blog_links[['text', 'url']].assign(source_page=lambda x: x['url'].map(url_to_type)))
-            
-            linked_urls = other_blog_links['url'].tolist()
-            missing_blogs = [b for b, url in zip(other_blogs, other_blog_urls) if url not in linked_urls]
-            if missing_blogs:
-                st.error(f"✗ Missing links to: {', '.join(missing_blogs)}")
-        
-        st.divider()
-        st.write("### Complete Interlinking Matrix")
-        st.write("1 indicates a link exists, 0 indicates no link, and NA indicates not applicable (self-link).")
+        st.subheader("Complete Interlinking Matrix")
+        st.write("In the below matrix 1 indicates a link exists, 0 indicates no link, and NA indicates not applicable (self-link)")
         st.markdown(styled_matrix.to_html(), unsafe_allow_html=True)
         
         progress_bar.empty()
