@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 import xml.etree.ElementTree as ET
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse,urljoin
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
 import concurrent.futures
@@ -157,57 +157,57 @@ def link():
         return results
 
     def parse_sitemap_index(sitemap_content: str, base_url: str) -> List[str]:
+        """Recursively processes sitemap indexes and nested sitemaps"""
         all_urls = []
         try:
             root = ET.fromstring(sitemap_content)
-            namespaces = {'sitemaps': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
-            sitemap_locs = root.findall('.//sitemaps:loc', namespaces)
+            namespaces = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
 
-            # Process nested sitemaps in parallel
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                future_to_url = {}
-                for loc in sitemap_locs:
-                    nested_sitemap_url = loc.text
-                    if not nested_sitemap_url.startswith('http'):
-                        nested_sitemap_url = base_url + (nested_sitemap_url if nested_sitemap_url.startswith('/') else f'/{nested_sitemap_url}')
+            # Check if this is a sitemap index
+            sitemap_locs = root.findall('.//ns:sitemap/ns:loc', namespaces)
+            if sitemap_locs:
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    future_to_url = {}
+                    for loc in sitemap_locs:
+                        nested_sitemap_url = urljoin(base_url, loc.text)
+                        future = executor.submit(requests.get, nested_sitemap_url,
+                                            timeout=15,
+                                            headers={'User-Agent': 'Mozilla/5.0...'})
+                        future_to_url[future] = nested_sitemap_url
 
-                    future = executor.submit(requests.get, nested_sitemap_url,
-                                          timeout=10,
-                                          headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
-                    future_to_url[future] = nested_sitemap_url
-
-                for future in as_completed(future_to_url):
-                    try:
-                        response = future.result()
-                        if response.status_code == 200:
-                            nested_urls = parse_sitemap(response.text)
-                            all_urls.extend(nested_urls)
-                    except requests.exceptions.RequestException as e:
-                        st.warning(f"Error accessing nested sitemap {future_to_url[future]}: {e}")
-
-        except ET.ParseError:
-            pass
+                    for future in as_completed(future_to_url):
+                        try:
+                            response = future.result()
+                            if response.status_code == 200:
+                                # Recursive call to handle nested indexes
+                                nested_urls = parse_sitemap_index(response.text, base_url) or parse_sitemap(response.text)
+                                all_urls.extend(nested_urls)
+                        except Exception as e:
+                            st.warning(f"Error processing {future_to_url[future]}: {e}")
+            else:
+                # Process regular sitemap
+                all_urls.extend(parse_sitemap(sitemap_content))
+                
+        except ET.ParseError as e:
+            st.warning(f"XML Parse Error: {e}")
         return all_urls
 
     def parse_sitemap(sitemap_content: str) -> List[str]:
+        """Improved sitemap parser with namespace-agnostic search"""
         urls = []
         try:
             root = ET.fromstring(sitemap_content)
-            namespaces = {'sitemaps': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
-            location_tags = [
-                ".//{http://www.sitemaps.org/schemas/sitemap/0.9}loc",
-                ".//sitemaps:loc"
-            ]
-
-            for tag in location_tags:
-                elements = root.findall(tag, namespaces)
-                if elements:
-                    urls = [element.text for element in elements]
-                    break
-
+            # Namespace-agnostic search for <loc> tags
+            for elem in root.iter():
+                if 'loc' in elem.tag:
+                    url = elem.text.strip()
+                    urls.append(url)
         except ET.ParseError:
-            pass
-        return urls
+            try:  # Fallback to text parsing for malformed XML
+                urls = re.findall(r'<loc>(.*?)</loc>', sitemap_content)
+            except:
+                pass
+        return list(set(urls))  # Remove duplicates
 
     # Streamlit UI setup
     st.write("Enter a website URL to fetch sitemap URLs.")
