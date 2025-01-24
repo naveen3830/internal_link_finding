@@ -69,6 +69,12 @@ def link():
             'zh': [r'/zh/', r'/zh-', r'/zhs/', r'/chinese/', r'/cn/', r'/hk/', r'/tw/', r'/zh-cn/', r'/zh-tw/', r'/zh-hk/', r'/zht/'],
             'ko': [r'/ko/', r'/ko-', r'/korean/', r'/kr/'],
             'ar': [r'/ar/', r'/ar-', r'/arabic/', r'/sa/', r'/ae/'],
+            'blogs': [r'/blogs/',r'/blogs-',r'/en/blogs/',r'/blog/'],
+            'products': [r'/products/','/products-'],
+            'resources': [r'/resources/','/resources-'],
+            'company': [r'/company/','/company-'],
+            'partners': [r'/partners/','/partners-'],
+            'solutions': [r'/solutions/','/solutions-'],
         }
 
         specific_domain_patterns = {
