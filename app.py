@@ -57,17 +57,20 @@ st.markdown(
         .sidebar .sidebar-content h1 {
             color: #1cb3e0;
         }
-
-        .stDownloadButton>button {
-            background-color: #1cb3e0;
-            color: #ffffff;
-            border-radius: 8px;
-            padding: 8px 16px;
-            transition: 0.3s ease-in-out;
-        }
-        .stDownloadButton>button:hover {
-            background-color: #148bb5;
-        }
+        .stDownloadButton, .stButton>button {
+                        width: 100%;
+                        justify-content: center;
+                        transition: all 0.3s ease;
+            }
+            .stDownloadButton>button, .stButton>button {
+                background-color: #4CAF50 !important;
+                color: white !important;
+                border: none !important;
+            }
+            .stDownloadButton>button:hover, .stButton>button:hover {
+                background-color: #45a049 !important;
+                transform: scale(1.05);
+            }
 
         input, textarea {
             background-color: #344758;

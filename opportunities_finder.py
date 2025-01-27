@@ -10,8 +10,6 @@ import re
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-# Streamlit and logging configuration
-# st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -37,43 +35,34 @@ def extract_text_from_html(html_content):
     
     return soup
 
-
 def find_unlinked_keywords(soup, keyword, target_url):
     keyword = keyword.strip()
+    cleaned_keyword = clean_text(keyword)
     unlinked_occurrences = []
     text_elements = soup.find_all(text=True)
-    existing_links = {
-        clean_text(link.get_text())
-        for link in soup.find_all('a') if link.get_text()
-    }
     
     for element in text_elements:
-        if not element.strip() or element.parent.name == 'a':
+        if not element.strip() or element.find_parents('a'):
             continue
         
-        clean_element = clean_text(element)
-        matches = list(re.finditer(r'\b' + re.escape(keyword) + r'\b', clean_element))
+        original_text = element.strip()
+        sentences = re.split(r'(?<=[.!?])\s+', original_text)
         
-        for match in matches:
-            match_text = element[match.start():match.end()]
-            clean_match_text = clean_text(match_text)
-            
-            # Only include if the keyword is NOT in any existing links
-            if clean_match_text not in existing_links:
-                start = max(0, match.start() - 50)
-                end = min(len(element), match.end() + 50)
-                context = element[start:end].strip()
-                
-                unlinked_occurrences.append({
-                    'context': context,
-                    'keyword': keyword
-                })
+        for sentence in sentences:
+            cleaned_sentence = clean_text(sentence)
+            matches = re.findall(r'\b{}\b'.format(re.escape(cleaned_keyword)), cleaned_sentence)
+            if matches:
+                for _ in matches:
+                    unlinked_occurrences.append({
+                        'context': sentence.strip(),
+                        'keyword': keyword,
+                        'target_url': target_url
+                    })
     
     return unlinked_occurrences
 
 def process_url(url, keyword, target_url):
     """Process a single URL to find unlinked keyword opportunities."""
-    # Skip processing if the URL is the same as the target URL
     if url.strip().rstrip('/') == target_url.strip().rstrip('/'):
         return None
     
@@ -108,12 +97,23 @@ def convert_df_to_csv(download_data):
 def Home():
     st.header("Internal Linking Opportunities Finder", divider='rainbow')
 
+    # Initialize session state variables
+    if 'uploaded_df' not in st.session_state:
+        st.session_state.uploaded_df = None
+    if 'keyword_inputs' not in st.session_state:
+        st.session_state.keyword_inputs = ['']
+    if 'target_url_inputs' not in st.session_state:
+        st.session_state.target_url_inputs = ['']
+    if 'processed_results' not in st.session_state:
+        st.session_state.processed_results = None
+    if 'num_pairs' not in st.session_state:
+        st.session_state.num_pairs = 1
+
     df = None
     if 'filtered_df' in st.session_state and st.session_state.filtered_df is not None:
         st.success("Using filtered data from the previous tab.")
         df = st.session_state.filtered_df
     else:
-        # Fallback: ask user to upload a file if filtered_df isn't available
         uploaded_file = st.file_uploader("Upload CSV or Excel file with URLs",
                                         type=["csv", "xlsx"],
                                         key="url_file_uploader")
@@ -126,28 +126,59 @@ def Home():
                 else:
                     st.error("Unsupported file format!")
                     return
+                st.session_state.uploaded_df = df
             except Exception as e:
                 st.error(f"An error occurred while reading the file: {str(e)}")
                 return
+        elif st.session_state.uploaded_df is not None:
+            df = st.session_state.uploaded_df
 
-    col1, col2 = st.columns([3, 3])
-    with col1:
-        keyword = st.text_input("Enter keyword to find",
-                                help="Find this keyword without existing links",
-                                key="keyword_input")
+    # Multiple keywords and target URLs input
+    st.subheader("Keywords and Target URLs", divider='rainbow')
+    
+    # Preserve number of pairs
+    num_pairs = st.number_input("Number of keyword-URL pairs", min_value=1,value=st.session_state.num_pairs,
+                            key='num_pairs_input')
+    st.session_state.num_pairs = num_pairs
 
-    with col2:
-        target_url = st.text_input("Target URL for linking",
-                                help="URL to suggest for internal linking",
-                                key="target_url_input")
+    # Initialize inputs if not present
+    if len(st.session_state.keyword_inputs) < num_pairs:
+        st.session_state.keyword_inputs += [''] * (num_pairs - len(st.session_state.keyword_inputs))
+    if len(st.session_state.target_url_inputs) < num_pairs:
+        st.session_state.target_url_inputs += [''] * (num_pairs - len(st.session_state.target_url_inputs))
 
-    max_workers = st.slider("Concurrent searches", min_value=1, max_value=10, value=2,
-                            help="Number of URLs to process simultaneously")
+    keyword_inputs = []
+    target_url_inputs = []
+    for i in range(num_pairs):
+        col1, col2 = st.columns([3, 3])
+        with col1:
+            keyword = st.text_input(
+                f"Keyword {i+1}", 
+                value=st.session_state.keyword_inputs[i],
+                key=f"keyword_input_{i}"
+            )
+            keyword_inputs.append(keyword)
+        with col2:
+            target_url = st.text_input(
+                f"Target URL {i+1}", 
+                value=st.session_state.target_url_inputs[i],
+                key=f"target_url_input_{i}"
+            )
+            target_url_inputs.append(target_url)
+
+    st.session_state.keyword_inputs = keyword_inputs
+    st.session_state.target_url_inputs = target_url_inputs
+
+    max_workers = st.slider("Concurrent searches", min_value=1, max_value=15, value=15,
+                        help="Number of URLs to process simultaneously")
 
     if st.button("Process"):
-        if df is not None and keyword and target_url:
+        keyword_url_pairs = [(k.strip(), u.strip()) 
+                        for k, u in zip(st.session_state.keyword_inputs, st.session_state.target_url_inputs) 
+                        if k.strip() and u.strip()]
+        
+        if df is not None and keyword_url_pairs:
             try:
-                # Validate URL column
                 if 'source_url' not in df.columns:
                     st.error("File must contain a 'source_url' column")
                     return
@@ -167,14 +198,17 @@ def Home():
                 results = []
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    future_to_url = {executor.submit(process_url, url, keyword, target_url): url for url in df['source_url'].unique()}
+                    futures = []
+                    for url in df['source_url'].unique():
+                        for keyword, target_url in keyword_url_pairs:
+                            futures.append(executor.submit(process_url, url, keyword, target_url))
 
-                    for future in concurrent.futures.as_completed(future_to_url):
+                    total_tasks = len(futures)
+                    for future in concurrent.futures.as_completed(futures):
                         processed += 1
-                        progress = processed / len(df)
+                        progress = processed / total_tasks
                         progress_bar.progress(progress)
                         result = future.result()
-
                         if result:
                             results.append(result)
 
@@ -182,36 +216,41 @@ def Home():
                 duration = time.time() - start_time
                 st.info(f"Search completed in {duration:.2f} seconds")
 
-                if results:
-                    download_data = []
-                    st.success(f"Unlinked keyword opportunities found in {len(results)} URLs")
+                st.session_state.processed_results = results if results else None
 
-                    with st.expander("View Opportunities", expanded=True):
-                        for result in results:
-                            st.write("---")
-                            st.write(f"🔗 Source URL: {result['url']}")
-
-                            if result.get('unlinked_matches'):
-                                st.write("Unlinked Keyword Occurrences:")
-                                for match in result['unlinked_matches']:
-                                    st.markdown(f"- *{match['keyword']}*: _{match['context']}_")
-                                    download_data.append({
-                                        'source_url': result['url'],
-                                        'keyword': match['keyword'],
-                                        'context': match['context']
-                                    })
-
-                    if download_data:
-                        csv = convert_df_to_csv(download_data)
-                        st.download_button(
-                            label="Download Opportunities CSV",
-                            data=csv,
-                            file_name=f'unlinked_keyword_opportunities_{keyword}.csv',
-                            mime='text/csv'
-                        )
-                else:
-                    st.warning(f"No unlinked keyword opportunities found for '{keyword}'")
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
         else:
             st.warning("Please provide all inputs and ensure valid data is available.")
+
+    if st.session_state.processed_results:
+        download_data = []
+        st.success(f"Unlinked keyword opportunities found in {len(st.session_state.processed_results)} URLs")
+
+        with st.expander("View Opportunities", expanded=True):
+            for result in st.session_state.processed_results:
+                st.write("---")
+                st.write(f"🔗 Source URL: {result['url']}")
+
+                if result.get('unlinked_matches'):
+                    st.write("Unlinked Keyword Occurrences:")
+                    for match in result['unlinked_matches']:
+                        st.markdown(f"- *{match['keyword']}* → {match['target_url']}")
+                        st.markdown(f"  Context: _{match['context']}_")
+                        download_data.append({
+                            'source_url': result['url'],
+                            'keyword': match['keyword'],
+                            'target_url': match['target_url'],
+                            'context': match['context']
+                        })
+
+        if download_data:
+            csv = convert_df_to_csv(download_data)
+            st.download_button(
+                label="Download Opportunities CSV",
+                data=csv,
+                file_name='unlinked_keyword_opportunities.csv',
+                mime='text/csv'
+            )
+    elif st.session_state.processed_results is None and 'processed_results' in st.session_state:
+        st.warning("No unlinked keyword opportunities found")
