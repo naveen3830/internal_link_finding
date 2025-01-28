@@ -253,4 +253,5 @@ def Home():
                 mime='text/csv'
             )
     elif st.session_state.processed_results is None and 'processed_results' in st.session_state:
-        st.warning("No unlinked keyword opportunities found")
+        pass
+        # st.warning("Enter the required data and click 'Process' to find unlinked keyword opportunities.")

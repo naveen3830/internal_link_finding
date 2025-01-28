@@ -69,7 +69,7 @@ def get_main_content_anchor_tags(url, page_type):
         return []
 
 def analyze_internal_links():
-    st.header("Internal Link Analysis", divider='rainbow')
+    st.header("Reverse Content Silos Analysis", divider='rainbow')
     
     col1, col2 = st.columns(2)
     with col1:
@@ -102,7 +102,7 @@ def analyze_internal_links():
         status_text = st.empty()
         
         all_links = {}
-        url_to_type = dict(zip(data['url'], data['type']))
+        url_to_type = dict(zip(data['url'], data['type']))  # URL -> Type mapping
         
         for idx, row in data.iterrows():
             status_text.text(f"Analyzing {row['type']}...")
@@ -213,7 +213,10 @@ def analyze_internal_links():
                 target_links = homepage_links_df[homepage_links_df['url'] == target_page_url]
                 if not target_links.empty:
                     st.write("Links found:")
-                    st.dataframe(target_links[['text', 'url']])
+                    # Map URLs to types using url_to_type
+                    st.dataframe(target_links.assign(
+                        type=target_links['url'].map(url_to_type)
+                    )[['text', 'url', 'type']])
             else:
                 st.error("✗ Homepage does not link to Target Page")
                 
@@ -223,7 +226,9 @@ def analyze_internal_links():
                 home_links = target_links_df[target_links_df['url'] == homepage_url]
                 if not home_links.empty:
                     st.write("Links found:")
-                    st.dataframe(home_links[['text', 'url']])
+                    st.dataframe(home_links.assign(
+                        type=home_links['url'].map(url_to_type)
+                    )[['text', 'url', 'type']])
             else:
                 st.error("✗ Target Page does not link to Homepage")
 
@@ -242,24 +247,32 @@ def analyze_internal_links():
                 home_links = blog_links_df[blog_links_df['url'] == homepage_url]
                 if not home_links.empty:
                     st.success("✓ Links to Homepage")
-                    st.dataframe(home_links[['text', 'url']])
+                    st.dataframe(home_links.assign(
+                        type=home_links['url'].map(url_to_type)
+                    )[['text', 'url', 'type']])
                 else:
                     st.error("✗ Does not link to Homepage")
                 
+                # Target Page links
                 target_links = blog_links_df[blog_links_df['url'] == target_page_url]
                 if not target_links.empty:
                     st.success("✓ Links to Target Page")
-                    st.dataframe(target_links[['text', 'url']])
+                    st.dataframe(target_links.assign(
+                        type=target_links['url'].map(url_to_type)
+                    )[['text', 'url', 'type']])
                 else:
                     st.error("✗ Does not link to Target Page")
                 
+                # Other Blog links
                 other_blogs = [b for b in data['type'][2:] if b != blog_type]
                 other_blog_urls = data[data['type'].isin(other_blogs)]['url'].tolist()
                 other_blog_links = blog_links_df[blog_links_df['url'].isin(other_blog_urls)]
                 
                 if not other_blog_links.empty:
                     st.write("Links to Other Blogs:")
-                    st.dataframe(other_blog_links[['text', 'url']])
+                    st.dataframe(other_blog_links.assign(
+                        type=other_blog_links['url'].map(url_to_type)
+                    )[['text', 'url', 'type']])
                 
                 missing_blogs = [b for b, url in zip(other_blogs, other_blog_urls) 
                                if url not in other_blog_links['url'].tolist()]
