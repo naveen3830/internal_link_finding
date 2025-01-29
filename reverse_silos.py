@@ -102,7 +102,7 @@ def analyze_internal_links():
         status_text = st.empty()
         
         all_links = {}
-        url_to_type = dict(zip(data['url'], data['type']))  # URL -> Type mapping
+        url_to_type = dict(zip(data['url'], data['type']))
         
         for idx, row in data.iterrows():
             status_text.text(f"Analyzing {row['type']}...")
@@ -126,9 +126,13 @@ def analyze_internal_links():
             index=data['type']
         ).rename_axis(None, axis=1).rename_axis(None, axis=0)
         
+        # Set diagonal to NA
         np.fill_diagonal(matrix_df.values, np.nan)
-        blog_types = [typ for typ in matrix_df.index if typ.startswith('Blog')]
-        matrix_df.loc[blog_types, 'Homepage'] = matrix_df.loc[blog_types, 'Homepage'].replace(0, np.nan)
+        
+        # Set Homepage to Blog links and Blog to Homepage links to NA
+        blog_types = [typ for typ in matrix_df.columns if typ.startswith('Blog')]
+        matrix_df.loc['Homepage', blog_types] = np.nan
+        matrix_df.loc[blog_types, 'Homepage'] = np.nan
         
         # Tooltips
         tooltip_data = []
@@ -159,19 +163,23 @@ def analyze_internal_links():
             ('color', st.get_option("theme.textColor")),
             ('border', f'2px solid {st.get_option("theme.primaryColor")}'),
             ('padding', '10px'),
-            ('font-family', st.get_option("theme.font")),
+            ('font-family', 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'),
             ('font-size', '13px'),
             ('box-shadow', '3px 3px 8px rgba(0, 0, 0, 0.5)'),
             ('border-radius', '5px')
         ]
         
         def color_cells(val):
-            if val == 1:
-                return 'background-color: #90EE90; color: black'
-            elif val == 0:
-                return 'background-color: #FF6B6B; color: white'
-            return f'background-color: {st.get_option("theme.secondaryBackgroundColor")}; color: {st.get_option("theme.textColor")}'
+            if pd.isna(val):
+                return f'background-color: {st.get_option("theme.secondaryBackgroundColor")}; color: {st.get_option("theme.textColor")}'
+            elif val == 1:
+                return 'background-color: #C8E6C9; color: black'  # Light green
+            else:
+                return 'background-color: #FFCDD2; color: black'  # Light red
 
+        # Define consistent font styling
+        font_family = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+        
         styled_matrix = (matrix_df
                         .style
                         .set_tooltips(tooltip_df, props=tooltip_style)
@@ -183,25 +191,39 @@ def analyze_internal_links():
                             'background-color': st.get_option("theme.backgroundColor"),
                             'color': st.get_option("theme.textColor"),
                             'border': f'1px solid {st.get_option("theme.primaryColor")}',
-                            'font-family': st.get_option("theme.font")
+                            'font-family': font_family,
+                            'font-size': '14px'
                         })
                         .applymap(color_cells)
                         .set_table_styles([{
                             'selector': 'th, td',
                             'props': [
                                 ('border', f'1px solid {st.get_option("theme.primaryColor")}'),
-                                ('padding', '8px 12px')
+                                ('padding', '8px 12px'),
+                                ('font-family', font_family),
+                                ('font-size', '14px')
                             ]
                         }, {
                             'selector': 'th',
                             'props': [
                                 ('background-color', st.get_option("theme.secondaryBackgroundColor")),
                                 ('color', st.get_option("theme.primaryColor")),
-                                ('font-weight', 'bold')
+                                ('font-weight', 'bold'),
+                                ('font-family', font_family),
+                                ('font-size', '14px')
                             ]
                         }]))
 
         st.divider()
+        st.subheader("Complete Interlinking Matrix")
+        st.write("In the below matrix 1 indicates a link exists, 0 indicates no link, and NA indicates not applicable (self-link)")
+        st.markdown(styled_matrix.to_html(), unsafe_allow_html=True)
+        
+        progress_bar.empty()
+        status_text.empty()
+        
+        st.divider()
+        
         with st.expander("Homepage & Target Page Links", expanded=False):
             st.write("### Homepage and Target Page Interlinking")
             home_to_target = matrix_df.loc['Homepage', 'Target Page'] == 1
@@ -213,7 +235,6 @@ def analyze_internal_links():
                 target_links = homepage_links_df[homepage_links_df['url'] == target_page_url]
                 if not target_links.empty:
                     st.write("Links found:")
-                    # Map URLs to types using url_to_type
                     st.dataframe(target_links.assign(
                         type=target_links['url'].map(url_to_type)
                     )[['text', 'url', 'type']])
@@ -242,16 +263,6 @@ def analyze_internal_links():
                 if blog_links_df.empty:
                     st.warning(f"No internal links found in {blog_type}")
                     continue
-                    
-                # Homepage links
-                home_links = blog_links_df[blog_links_df['url'] == homepage_url]
-                if not home_links.empty:
-                    st.success("✓ Links to Homepage")
-                    st.dataframe(home_links.assign(
-                        type=home_links['url'].map(url_to_type)
-                    )[['text', 'url', 'type']])
-                else:
-                    st.error("✗ Does not link to Homepage")
                 
                 # Target Page links
                 target_links = blog_links_df[blog_links_df['url'] == target_page_url]
@@ -278,11 +289,3 @@ def analyze_internal_links():
                                if url not in other_blog_links['url'].tolist()]
                 if missing_blogs:
                     st.error(f"Missing links to: {', '.join(missing_blogs)}")
-
-        st.divider()
-        st.subheader("Complete Interlinking Matrix")
-        st.write("In the below matrix 1 indicates a link exists, 0 indicates no link, and NA indicates not applicable (self-link)")
-        st.markdown(styled_matrix.to_html(), unsafe_allow_html=True)
-        
-        progress_bar.empty()
-        status_text.empty()

@@ -24,7 +24,7 @@ def clean_text(text):
 def extract_text_from_html(html_content):
     """Extract meaningful text from HTML while preserving structure."""
     soup = BeautifulSoup(html_content, 'html.parser')
-    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 'h1', 'h2', 'h3']):
+    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 'h1', 'h2', 'h3','h4','h5','h6']):
         element.decompose()
 
     for element in soup.find_all(attrs={"class": [
@@ -38,6 +38,13 @@ def extract_text_from_html(html_content):
 def find_unlinked_keywords(soup, keyword, target_url):
     keyword = keyword.strip()
     cleaned_keyword = clean_text(keyword)
+    keyword_terms = cleaned_keyword.split()
+    
+    if not keyword_terms:
+        return []
+
+    escaped_terms = [re.escape(term) for term in keyword_terms]
+    pattern = r'\b' + r'\s+'.join(escaped_terms) + r'\b'
     unlinked_occurrences = []
     text_elements = soup.find_all(text=True)
     
@@ -50,7 +57,7 @@ def find_unlinked_keywords(soup, keyword, target_url):
         
         for sentence in sentences:
             cleaned_sentence = clean_text(sentence)
-            matches = re.findall(r'\b{}\b'.format(re.escape(cleaned_keyword)), cleaned_sentence)
+            matches = re.findall(pattern, cleaned_sentence)
             if matches:
                 for _ in matches:
                     unlinked_occurrences.append({
@@ -96,18 +103,17 @@ def convert_df_to_csv(download_data):
 
 def Home():
     st.header("Internal Linking Opportunities Finder", divider='rainbow')
-
-    # Initialize session state variables
-    if 'uploaded_df' not in st.session_state:
-        st.session_state.uploaded_df = None
-    if 'keyword_inputs' not in st.session_state:
-        st.session_state.keyword_inputs = ['']
-    if 'target_url_inputs' not in st.session_state:
-        st.session_state.target_url_inputs = ['']
-    if 'processed_results' not in st.session_state:
-        st.session_state.processed_results = None
-    if 'num_pairs' not in st.session_state:
-        st.session_state.num_pairs = 1
+    session_vars = [
+        'uploaded_df', 'keyword_inputs', 'target_url_inputs',
+        'processed_results', 'num_pairs', 'processing_done'
+    ]
+    for var in session_vars:
+        if var not in st.session_state:
+            st.session_state[var] = None if var != 'num_pairs' else 1
+            if var == 'keyword_inputs' or var == 'target_url_inputs':
+                st.session_state[var] = ['']
+            if var == 'processing_done':
+                st.session_state[var] = False
 
     df = None
     if 'filtered_df' in st.session_state and st.session_state.filtered_df is not None:
@@ -133,19 +139,18 @@ def Home():
         elif st.session_state.uploaded_df is not None:
             df = st.session_state.uploaded_df
 
-    # Multiple keywords and target URLs input
+    # Keyword-URL pairs input
     st.subheader("Keywords and Target URLs", divider='rainbow')
-    
-    # Preserve number of pairs
-    num_pairs = st.number_input("Number of keyword-URL pairs", min_value=1,value=st.session_state.num_pairs,
-                            key='num_pairs_input')
+    num_pairs = st.number_input("Number of keyword-URL pairs", 
+                               min_value=1,
+                               value=st.session_state.num_pairs,
+                               key='num_pairs_input')
     st.session_state.num_pairs = num_pairs
 
-    # Initialize inputs if not present
-    if len(st.session_state.keyword_inputs) < num_pairs:
-        st.session_state.keyword_inputs += [''] * (num_pairs - len(st.session_state.keyword_inputs))
-    if len(st.session_state.target_url_inputs) < num_pairs:
-        st.session_state.target_url_inputs += [''] * (num_pairs - len(st.session_state.target_url_inputs))
+    # Initialize inputs
+    for inputs in ['keyword_inputs', 'target_url_inputs']:
+        if len(st.session_state[inputs]) < num_pairs:
+            st.session_state[inputs] += [''] * (num_pairs - len(st.session_state[inputs]))
 
     keyword_inputs = []
     target_url_inputs = []
@@ -169,13 +174,16 @@ def Home():
     st.session_state.keyword_inputs = keyword_inputs
     st.session_state.target_url_inputs = target_url_inputs
 
-    max_workers = st.slider("Concurrent searches", min_value=1, max_value=15, value=15,
-                        help="Number of URLs to process simultaneously")
+    max_workers = st.slider("Concurrent searches", 
+                           min_value=1, 
+                           max_value=15, 
+                           value=15,
+                           help="Number of URLs to process simultaneously")
 
     if st.button("Process"):
         keyword_url_pairs = [(k.strip(), u.strip()) 
-                        for k, u in zip(st.session_state.keyword_inputs, st.session_state.target_url_inputs) 
-                        if k.strip() and u.strip()]
+                           for k, u in zip(st.session_state.keyword_inputs, st.session_state.target_url_inputs) 
+                           if k.strip() and u.strip()]
         
         if df is not None and keyword_url_pairs:
             try:
@@ -217,15 +225,18 @@ def Home():
                 st.info(f"Search completed in {duration:.2f} seconds")
 
                 st.session_state.processed_results = results if results else None
+                st.session_state.processing_done = True
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
         else:
             st.warning("Please provide all inputs and ensure valid data is available.")
 
+    # Results display
     if st.session_state.processed_results:
         download_data = []
-        st.success(f"Unlinked keyword opportunities found in {len(st.session_state.processed_results)} URLs")
+        matched_urls = len({res['url'] for res in st.session_state.processed_results})
+        st.success(f"Found {len(st.session_state.processed_results)} opportunities across {matched_urls} URLs")
 
         with st.expander("View Opportunities", expanded=True):
             for result in st.session_state.processed_results:
@@ -252,6 +263,7 @@ def Home():
                 file_name='unlinked_keyword_opportunities.csv',
                 mime='text/csv'
             )
+    elif st.session_state.processing_done and st.session_state.processed_results is None:
+        st.info("No interlinking opportunities found.")
     elif st.session_state.processed_results is None and 'processed_results' in st.session_state:
         pass
-        # st.warning("Enter the required data and click 'Process' to find unlinked keyword opportunities.")
