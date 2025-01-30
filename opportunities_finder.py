@@ -232,7 +232,6 @@ def Home():
         else:
             st.warning("Please provide all inputs and ensure valid data is available.")
 
-    # Results display
     if st.session_state.processed_results:
         download_data = []
         matched_urls = len({res['url'] for res in st.session_state.processed_results})

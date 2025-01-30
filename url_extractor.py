@@ -219,17 +219,14 @@ def detect_url_language(url):
         'es': [r'teamviewer\.com/latam']
     }
 
-    # First check specific domain patterns
     for lang, patterns in specific_domain_patterns.items():
         if any(re.search(pattern, url, re.IGNORECASE) for pattern in patterns):
             return lang
 
-    # Check TLD
     for domain_suffix, lang in country_lang_map.items():
         if hostname.endswith(domain_suffix):
             return lang
 
-    # Check language patterns with word boundaries
     path_parts = path.split('/')
     for lang, patterns in language_patterns.items():
         for pattern in patterns:
@@ -237,7 +234,6 @@ def detect_url_language(url):
             if clean_pattern in path_parts:
                 return lang
 
-    # Check query parameters for language
     if parsed_url.query:
         lang_param = re.search(r'(?:^|&)lang=([a-zA-Z]{2})', parsed_url.query)
         if lang_param and lang_param.group(1).lower() in language_patterns:
@@ -304,9 +300,8 @@ def parse_sitemap(sitemap_content):
         loc_tags = soup.find_all('loc')
         for tag in loc_tags:
             url = tag.get_text().strip()
-            # Check if URL ends with an image extension
             if any(url.lower().endswith(ext) for ext in image_extensions):
-                continue  # Skip image URLs
+                continue 
             urls.append(url)
     except Exception as e:
         st.warning(f"Error parsing sitemap: {e}")
