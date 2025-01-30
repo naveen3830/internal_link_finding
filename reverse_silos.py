@@ -292,8 +292,7 @@ def file_upload_tab():
     # st.info("🔎 No file uploaded yet. Please upload a file to begin the analysis.")
     
     st.warning("""File Requirements:
-            - Must be an Excel or CSV file,
-            - Must contain the columns 'type' and 'url'
+            - Must be an Excel or CSV file and contain the columns 'type' and 'url'
             """)
     
     example_data = pd.read_csv('example_data.csv')
@@ -347,10 +346,10 @@ def analyze_internal_links():
     
         """)
     
-    col1, col2, col3 = st.columns([0.4,2,0.6])
-    with col2:
-        st.image(r"reverse_silos.png", caption="Reverse Content Silos Analysis", width=700)
-    
+        col1, col2, col3 = st.columns([0.4,2,0.6])
+        with col2:
+            st.image(r"reverse_silos.png", caption="Reverse Content Silos Analysis", width=700)
+        
     tab1, tab2 = st.tabs(["Manual Input", "File Upload"])
     
     with tab1:
