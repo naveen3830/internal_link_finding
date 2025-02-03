@@ -154,7 +154,6 @@ def detect_url_language(url):
     path = parsed_url.path.lower()
     hostname = parsed_url.hostname.lower() if parsed_url.hostname else ''
 
-    # Country-specific TLD mapping
     country_lang_map = {
         '.cn': 'zh',    # China
         '.jp': 'ja',    # Japan

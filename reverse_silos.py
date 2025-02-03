@@ -254,8 +254,7 @@ def run_analysis(data):
                         type=other_blog_links['url'].map(url_to_type)
                     )[['text', 'url', 'type']])
                 
-                missing_blogs = [b for b in other_blogs 
-                               if data[data['type'] == b]['url'].values[0] not in other_blog_links['url'].tolist()]
+                missing_blogs = [b for b in other_blogs if data[data['type'] == b]['url'].values[0] not in other_blog_links['url'].tolist()]
                 if missing_blogs:
                     st.error(f"Missing links to: {', '.join(missing_blogs)}")
 
@@ -336,14 +335,12 @@ def analyze_internal_links():
     
     with st.expander("Understanding Reverse Content Silos"):
         st.markdown("""
-        Reverse content silos represent a strategic internal linking structure where supporting content pieces 
-        interlink with each other and point to a central target page.In this structure:
+        Reverse content silos represent a strategic internal linking structure where supporting content pieces interlink with each other and point to a central target page. In this structure:
         
     - Supporting articles link to each other to share authority
     - All supporting content points to a main target page
     - The target page connects with the homepage
     - Each supporting article can receive external backlinks
-    
         """)
     
         col1, col2, col3 = st.columns([0.4,2,0.6])
