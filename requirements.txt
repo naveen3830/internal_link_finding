@@ -17,3 +17,5 @@ beautifulsoup4
 lxml
 nest_asyncio
 streamlit_option_menu
+langchain
+langchain-groq

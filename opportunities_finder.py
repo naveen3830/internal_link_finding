@@ -21,33 +21,31 @@ logger = logging.getLogger(__name__)
 def generate_related_keywords(keyword):
     """Generate related keywords using Groq LLM."""
     try:
-        groq_api_key = os.getenv('GROQ_API_KEY')  # Replace with your actual Groq API key
+        groq_api_key = os.getenv('GROQ_API_KEY')
         llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile")
-        
-        # Add logging to track API calls
         logger.info(f"Generating keywords for: {keyword}")
         
         template = """As a professional SEO strategist, generate 3 high-potential keywords for {keyword} following these STRICT guidelines:
-1. Output MUST be 3 lines, each containing ONLY one keyword.
-2. Keywords must include commercial intent modifiers like "best," "near me," "cost," or "vs."
-3. Keywords must be 2-5 words long.
-4. Exclude informational terms like "what," "how," or "why."
-5. Use Title Case formatting.
-6. Ensure keywords are actionable and rankable.
+        1. Output MUST be 3 lines, each containing ONLY one keyword.
+        2. Keywords must include commercial intent modifiers like "best," "near me," "cost," or "vs."
+        3. Keywords must be 2-5 words long.
+        4. Exclude informational terms like "what," "how," or "why."
+        5. Use Title Case formatting.
+        6. Ensure keywords are actionable and rankable.
 
-BAD EXAMPLE (Avoid):
-- Doctor Qualifications
-- Medical Practitioner Licensing
-- Physician Education Requirements
+        BAD EXAMPLE (Avoid):
+        - Doctor Qualifications
+        - Medical Practitioner Licensing
+        - Physician Education Requirements
 
-GOOD EXAMPLE:
-Best Cardiologist Near Me
-Pediatrician Vs Family Doctor Costs
-24/7 Emergency Doctors [City]
+        GOOD EXAMPLE:
+        Best Cardiologist Near Me
+        Pediatrician Vs Family Doctor Costs
+        24/7 Emergency Doctors [City]
 
-Generate COMPETITIVE keywords for: {keyword}
+        Generate COMPETITIVE keywords for: {keyword}
 
-Remember: Output ONLY the 3 keywords, one per line, nothing else."""
+        Remember: Output ONLY the 3 keywords, one per line, nothing else."""
 
         prompt = PromptTemplate(
             input_variables=["keyword"],
@@ -56,25 +54,17 @@ Remember: Output ONLY the 3 keywords, one per line, nothing else."""
         
         formatted_prompt = prompt.format(keyword=keyword)
         response = llm.invoke(formatted_prompt)
-        
-        # Add logging for response
         logger.info(f"Received response from Groq: {response.content}")
-        
-        # Process the response
+
         keyword_list = []
         lines = [line for line in response.content.split("\n") if line.strip()]
         
-        for line in lines[:3]:  # Only take first 3 non-empty lines
-            # Clean the line
+        for line in lines[:3]:
             cleaned = re.sub(r'[^a-zA-Z0-9\s\-\&]', '', line.strip())
-            # Skip empty lines or lines that don't meet criteria
             if cleaned and 2 <= len(cleaned.split()) <= 5:
                 keyword_list.append(cleaned.title())
-        
-        # Add logging for generated keywords
+
         logger.info(f"Generated keywords: {keyword_list}")
-        
-        # If no valid keywords were generated, create some basic ones
         if not keyword_list:
             default_keywords = [
                 f"Best {keyword} Near Me",

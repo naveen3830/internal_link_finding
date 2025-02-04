@@ -39,7 +39,6 @@ def link():
 
     st.header("🌐 URL Extractor", divider='rainbow')
     
-    # Main functionality container
     with st.container():
         st.markdown("""
         **How to use:**
