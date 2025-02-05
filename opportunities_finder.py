@@ -31,7 +31,7 @@ def generate_related_keywords(keyword):
         3. Keywords must be 2-5 words long.
         4. Exclude informational terms like "what," "how," or "why."
         5. Use Title Case formatting.
-        6. Ensure keywords are actionable and rankable.
+        6. Ensure keywords are actionable and rank able.
 
         BAD EXAMPLE (Avoid):
         - Doctor Qualifications
