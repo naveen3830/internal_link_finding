@@ -86,9 +86,12 @@ def link():
             else:
                 if not st.session_state.all_urls:
                     with st.spinner("🔍 Scanning website for sitemaps..."):
-                        st.session_state.all_urls = fetch_sitemap_urls(website_url)
+                        fetched_urls = fetch_sitemap_urls(website_url)
+                        unique_urls = list(set(fetched_urls)) 
+                        st.session_state.all_urls = unique_urls
+                        
                         if st.session_state.all_urls:
-                            st.success(f"✅ Found {len(st.session_state.all_urls)} total URLs!")
+                            st.success(f"✅ Found {len(st.session_state.all_urls)} URLs!")
                             progress_bar = st.progress(0)
                             st.session_state.language_results = []
                             
@@ -97,10 +100,12 @@ def link():
                                 url_lang = detect_url_language(url)
                                 st.session_state.language_results.append({
                                     'source_url': url,
-                                    'Language/Category': url_lang})
+                                    'Language/Category': url_lang
+                                })
                             
                             progress_bar.empty()
-                            st.session_state.lang_df = pd.DataFrame(st.session_state.language_results)
+                            
+                            st.session_state.lang_df = pd.DataFrame(st.session_state.language_results).drop_duplicates(subset=['source_url'])
                         else:
                             st.error("⚠️ No sitemap or URLs found. Please check the website URL.")
 
