@@ -4,6 +4,7 @@ from opportunities_finder import Home
 from url_extractor import link
 import hashlib
 from reverse_silos import analyze_internal_links
+from file_uploader import file_uploader_feature
 
 st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
 
@@ -209,8 +210,8 @@ def main():
             
             selected = option_menu(
                 'Main Menu',
-                ['URL Extractor', 'Keyword Analysis','Reverse Silos'],
-                icons=['house', 'list-check','crosshair'],
+                ['URL Extractor', 'Keyword Analysis','Reverse Silos','File Uploader'],
+                icons=['house', 'list-check','crosshair','file-earmark-text'],
                 default_index=0,
                 menu_icon="cast"
             )
@@ -225,6 +226,8 @@ def main():
             Home()
         elif selected == "Reverse Silos":
             analyze_internal_links()
+        elif selected == "File Uploader":
+            file_uploader_feature()
         
 if __name__ == "__main__":
     main()
