@@ -7,87 +7,11 @@ import time
 import logging
 from urllib3.exceptions import InsecureRequestWarning
 import re
-from langchain.prompts import PromptTemplate
-import os
-from langchain_groq import ChatGroq
-from dotenv import load_dotenv
-load_dotenv()
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-def generate_related_keywords(keyword):
-    """Generate related keywords using Groq LLM."""
-    try:
-        groq_api_key = os.getenv('GROQ_API_KEY')
-        llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile")
-        logger.info(f"Generating keywords for: {keyword}")
-        
-        template = """As a professional SEO strategist, generate 3 high-potential keywords for {keyword} following these STRICT guidelines:
-        1. Output MUST be 3 lines, each containing ONLY one keyword.
-        2. Keywords must include commercial intent modifiers like "best," "near me," "cost," or "vs."
-        3. Keywords must be 2-5 words long.
-        4. Exclude informational terms like "what," "how," or "why."
-        5. Use Title Case formatting.
-        6. Ensure keywords are actionable and rank able.
-
-        BAD EXAMPLE (Avoid):
-        - Doctor Qualifications
-        - Medical Practitioner Licensing
-        - Physician Education Requirements
-
-        GOOD EXAMPLE:
-        Best Cardiologist Near Me
-        Pediatrician Vs Family Doctor Costs
-        24/7 Emergency Doctors [City]
-
-        Generate COMPETITIVE keywords for: {keyword}
-
-        Remember: Output ONLY the 3 keywords, one per line, nothing else."""
-
-        prompt = PromptTemplate(
-            input_variables=["keyword"],
-            template=template
-        )
-        
-        formatted_prompt = prompt.format(keyword=keyword)
-        response = llm.invoke(formatted_prompt)
-        
-        logger.info(f"Received response from Groq: {response.content}")
-        
-        keyword_list = []
-        lines = [line for line in response.content.split("\n") if line.strip()]
-        
-        for line in lines[:3]: 
-            cleaned = re.sub(r'[^a-zA-Z0-9\s\-\&]', '', line.strip())
-
-            if cleaned and 2 <= len(cleaned.split()) <= 5:
-                keyword_list.append(cleaned.title())
-        logger.info(f"Generated keywords: {keyword_list}")
-        
-        if not keyword_list:
-            default_keywords = [
-                f"Best {keyword} Near Me",
-                f"{keyword} Cost",
-                f"Top {keyword} Services"
-            ]
-            logger.info(f"Using default keywords: {default_keywords}")
-            return default_keywords
-            
-        return keyword_list
-        
-    except Exception as e:
-        logger.error(f"Error generating keywords: {str(e)}")
-        st.error(f"Error generating keywords: {str(e)}") 
-        default_keywords = [
-            f"Best {keyword} Near Me",
-            f"{keyword} Cost",
-            f"Top {keyword} Services"
-        ]
-        logger.info(f"Using default keywords due to error: {default_keywords}")
-        return default_keywords
 
 def clean_text(text):
     """Clean and normalize text for consistent matching."""
@@ -111,45 +35,40 @@ def extract_text_from_html(html_content):
     
     return soup
 
-def find_unlinked_keywords(soup, keywords, target_url):
-    """Find unlinked keywords in text, supporting multiple keywords."""
-    if not isinstance(keywords, list):
-        keywords = [keywords]
+def find_unlinked_keywords(soup, keyword, target_url):
+    keyword = keyword.strip()
+    cleaned_keyword = clean_text(keyword)
+    keyword_terms = cleaned_keyword.split()
     
+    if not keyword_terms:
+        return []
+
+    escaped_terms = [re.escape(term) for term in keyword_terms]
+    pattern = r'\b' + r'\s+'.join(escaped_terms) + r'\b'
     unlinked_occurrences = []
     text_elements = soup.find_all(text=True)
     
-    for keyword in keywords:
-        cleaned_keyword = clean_text(keyword)
-        keyword_terms = cleaned_keyword.split()
-        
-        if not keyword_terms:
+    for element in text_elements:
+        if not element.strip() or element.find_parents('a'):
             continue
-
-        escaped_terms = [re.escape(term) for term in keyword_terms]
-        pattern = r'\b' + r'\s+'.join(escaped_terms) + r'\b'
         
-        for element in text_elements:
-            if not element.strip() or element.find_parents('a'):
-                continue
-            
-            original_text = element.strip()
-            sentences = re.split(r'(?<=[.!?])\s+', original_text)
-            
-            for sentence in sentences:
-                cleaned_sentence = clean_text(sentence)
-                matches = re.findall(pattern, cleaned_sentence)
-                if matches:
-                    for _ in matches:
-                        unlinked_occurrences.append({
-                            'context': sentence.strip(),
-                            'keyword': keyword,
-                            'target_url': target_url
-                        })
+        original_text = element.strip()
+        sentences = re.split(r'(?<=[.!?])\s+', original_text)
+        
+        for sentence in sentences:
+            cleaned_sentence = clean_text(sentence)
+            matches = re.findall(pattern, cleaned_sentence)
+            if matches:
+                for _ in matches:
+                    unlinked_occurrences.append({
+                        'context': sentence.strip(),
+                        'keyword': keyword,
+                        'target_url': target_url
+                    })
     
     return unlinked_occurrences
 
-def process_url(url, keywords, target_url):
+def process_url(url, keyword, target_url):
     """Process a single URL to find unlinked keyword opportunities."""
     if url.strip().rstrip('/') == target_url.strip().rstrip('/'):
         return None
@@ -164,7 +83,7 @@ def process_url(url, keywords, target_url):
         response.raise_for_status()
         
         soup = extract_text_from_html(response.text)
-        unlinked_matches = find_unlinked_keywords(soup, keywords, target_url)
+        unlinked_matches = find_unlinked_keywords(soup, keyword, target_url)
         
         if unlinked_matches:
             return {
@@ -184,11 +103,9 @@ def convert_df_to_csv(download_data):
 
 def Home():
     st.header("Internal Linking Opportunities Finder", divider='rainbow')
-    
     session_vars = [
         'uploaded_df', 'keyword_inputs', 'target_url_inputs',
-        'processed_results', 'num_pairs', 'processing_done',
-        'generated_keywords'
+        'processed_results', 'num_pairs', 'processing_done'
     ]
     for var in session_vars:
         if var not in st.session_state:
@@ -197,8 +114,6 @@ def Home():
                 st.session_state[var] = ['']
             if var == 'processing_done':
                 st.session_state[var] = False
-            if var == 'generated_keywords':
-                st.session_state[var] = {}
 
     df = None
     if 'filtered_df' in st.session_state and st.session_state.filtered_df is not None:
@@ -247,14 +162,6 @@ def Home():
                 value=st.session_state.keyword_inputs[i],
                 key=f"keyword_input_{i}"
             )
-            if keyword:
-                if keyword not in st.session_state.generated_keywords:
-                    with st.spinner(f"Generating keywords for: {keyword}"):
-                        st.session_state.generated_keywords[keyword] = generate_related_keywords(keyword)
-                with st.expander(f"Generated keywords for: {keyword}"):
-                    st.write("Including these additional keywords in search:")
-                    for gen_keyword in st.session_state.generated_keywords[keyword]:
-                        st.write(f"- {gen_keyword}")
             keyword_inputs.append(keyword)
         with col2:
             target_url = st.text_input(
@@ -274,16 +181,9 @@ def Home():
                            help="Number of URLs to process simultaneously")
 
     if st.button("Process"):
-        # Prepare keyword-URL pairs including generated keywords
-        keyword_url_pairs = []
-        for k, u in zip(st.session_state.keyword_inputs, st.session_state.target_url_inputs):
-            if k.strip() and u.strip():
-                # Add original keyword
-                keyword_url_pairs.append((k.strip(), u.strip()))
-                # Add generated keywords
-                if k in st.session_state.generated_keywords:
-                    for gen_k in st.session_state.generated_keywords[k]:
-                        keyword_url_pairs.append((gen_k, u.strip()))
+        keyword_url_pairs = [(k.strip(), u.strip()) 
+                           for k, u in zip(st.session_state.keyword_inputs, st.session_state.target_url_inputs) 
+                           if k.strip() and u.strip()]
         
         if df is not None and keyword_url_pairs:
             try:
@@ -299,7 +199,7 @@ def Home():
                     st.error("No valid URLs found in the file")
                     return
 
-                st.info(f"Processing {len(df)} URLs with {len(keyword_url_pairs)} keyword-URL pairs...")
+                st.info(f"Processing {len(df)} URLs...")
                 start_time = time.time()
                 progress_bar = st.progress(0)
                 processed = 0
@@ -309,12 +209,7 @@ def Home():
                     futures = []
                     for url in df['source_url'].unique():
                         for keyword, target_url in keyword_url_pairs:
-                            futures.append(executor.submit(
-                                process_url, 
-                                url, 
-                                [keyword] + (st.session_state.generated_keywords.get(keyword, []) if keyword in st.session_state.keyword_inputs else []),
-                                target_url
-                            ))
+                            futures.append(executor.submit(process_url, url, keyword, target_url))
 
                     total_tasks = len(futures)
                     for future in concurrent.futures.as_completed(futures):
@@ -370,4 +265,4 @@ def Home():
     elif st.session_state.processing_done and st.session_state.processed_results is None:
         st.info("No interlinking opportunities found.")
     elif st.session_state.processed_results is None and 'processed_results' in st.session_state:
-        pass    
+        pass
