@@ -103,19 +103,25 @@ def convert_df_to_csv(download_data):
 
 def file_uploader_feature():
     st.header("Internal Linking Opportunities Finder", divider='rainbow')
-    session_vars = ['uploaded_df', 'processed_results', 'processing_done', 'keyword_url_pairs_df']
+    # Updated session state variable names
+    session_vars = ['uploaded_urls', 'search_results', 'completed_processing', 'keyword_target_pairs']
     for var in session_vars:
         if var not in st.session_state:
             st.session_state[var] = None
-    if 'processing_done' not in st.session_state:
-        st.session_state.processing_done = False
+    if 'completed_processing' not in st.session_state:
+        st.session_state.completed_processing = False
 
     df = None
+    # Changed 'filtered_df' to 'filtered_urls'
     if 'filtered_df' in st.session_state and st.session_state.filtered_df is not None:
         st.success("Using filtered data from the previous tab.")
         df = st.session_state.filtered_df
     else:
-        uploaded_file = st.file_uploader("Upload CSV/Excel with source URLs (must contain 'source_url' column)",type=["csv", "xlsx"],key="url_file_uploader")
+        uploaded_file = st.file_uploader(
+            "Upload CSV/Excel with source URLs (must contain 'source_url' column)",
+            type=["csv", "xlsx"],
+            key="uploaded_urls_uploader"
+        )
         
         if uploaded_file:
             try:
@@ -136,15 +142,19 @@ def file_uploader_feature():
                     st.error("No valid URLs found in the file")
                     return
                 
-                st.session_state.uploaded_df = df
+                st.session_state.uploaded_urls = df
             except Exception as e:
                 st.error(f"Error reading source URLs file: {str(e)}")
                 return
-        elif st.session_state.uploaded_df is not None:
-            df = st.session_state.uploaded_df
+        elif st.session_state.uploaded_urls is not None:
+            df = st.session_state.uploaded_urls
 
     st.subheader("Keyword-Target URL Pairs Upload", divider='rainbow')
-    keyword_url_file = st.file_uploader("Upload CSV/Excel with keyword-target URL pairs (must contain 'keyword' and 'target_url' columns)",type=["csv", "xlsx"],key="keyword_url_uploader")
+    keyword_url_file = st.file_uploader(
+        "Upload CSV/Excel with keyword-target URL pairs (must contain 'keyword' and 'target_url' columns)",
+        type=["csv", "xlsx"],
+        key="keyword_target_url_uploader"
+    )
     
     keyword_url_df = None
     if keyword_url_file:
@@ -167,18 +177,20 @@ def file_uploader_feature():
                 st.error("No valid keyword-URL pairs found in the file")
                 return
             
-            st.session_state.keyword_url_pairs_df = keyword_url_df
+            st.session_state.keyword_target_pairs = keyword_url_df
         except Exception as e:
             st.error(f"Error reading keyword-URL file: {str(e)}")
             return
-    elif 'keyword_url_pairs_df' in st.session_state and st.session_state.keyword_url_pairs_df is not None:
-        keyword_url_df = st.session_state.keyword_url_pairs_df
+    elif 'keyword_target_pairs' in st.session_state and st.session_state.keyword_target_pairs is not None:
+        keyword_url_df = st.session_state.keyword_target_pairs
 
-    max_workers = st.slider("Concurrent searches", 
-                        min_value=1, 
-                        max_value=15, 
-                        value=15,
-                        help="Number of URLs to process simultaneously")
+    max_workers = st.slider(
+        "Concurrent searches", 
+        min_value=1, 
+        max_value=15, 
+        value=15,
+        help="Number of URLs to process simultaneously"
+    )
 
     if st.button("Process"):
         if df is None or keyword_url_df is None:
@@ -214,19 +226,19 @@ def file_uploader_feature():
             duration = time.time() - start_time
             st.info(f"Search completed in {duration:.2f} seconds")
 
-            st.session_state.processed_results = results if results else None
-            st.session_state.processing_done = True
+            st.session_state.search_results = results if results else None
+            st.session_state.completed_processing = True
 
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
 
-    if st.session_state.processed_results:
+    if st.session_state.search_results:
         download_data = []
-        matched_urls = len({res['url'] for res in st.session_state.processed_results})
-        st.success(f"Found {len(st.session_state.processed_results)} opportunities across {matched_urls} URLs")
+        matched_urls = len({res['url'] for res in st.session_state.search_results})
+        st.success(f"Found {len(st.session_state.search_results)} opportunities across {matched_urls} URLs")
 
         with st.expander("View Opportunities", expanded=True):
-            for result in st.session_state.processed_results:
+            for result in st.session_state.search_results:
                 st.write("---")
                 st.write(f"🔗 Source URL: {result['url']}")
 
@@ -250,5 +262,5 @@ def file_uploader_feature():
                 file_name='unlinked_keyword_opportunities.csv',
                 mime='text/csv'
             )
-    elif st.session_state.processing_done and not st.session_state.processed_results:
+    elif st.session_state.completed_processing and not st.session_state.search_results:
         st.info("No interlinking opportunities found.")

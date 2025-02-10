@@ -141,10 +141,8 @@ def Home():
 
     # Keyword-URL pairs input
     st.subheader("Keywords and Target URLs", divider='rainbow')
-    num_pairs = st.number_input("Number of keyword-URL pairs", 
-                               min_value=1,
-                               value=st.session_state.num_pairs,
-                               key='num_pairs_input')
+    num_pairs = st.number_input("Number of keyword-URL pairs",min_value=1,value=st.session_state.num_pairs,
+                            key='num_pairs_input')
     st.session_state.num_pairs = num_pairs
 
     # Initialize inputs
