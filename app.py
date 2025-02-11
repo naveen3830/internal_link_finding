@@ -1,10 +1,10 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
-from opportunities_finder import Home
-from url_extractor import link
+from modules.opportunities_finder import Home
+from modules.url_extractor import link
 import hashlib
-from reverse_silos import analyze_internal_links
-from file_uploader import file_uploader_feature
+from modules.reverse_silos import analyze_internal_links
+from modules.file_uploader import file_uploader_feature
 
 st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
 

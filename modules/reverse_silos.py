@@ -405,7 +405,7 @@ def file_upload_tab():
     )
     
     try:
-        example_data = pd.read_csv('example_data.csv')
+        example_data = pd.read_csv('data/example_data.csv')
         st.dataframe(example_data)
     except Exception:
         st.info("Example file not found. Please upload your file.")
