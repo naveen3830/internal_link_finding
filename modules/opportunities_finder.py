@@ -8,10 +8,7 @@ import logging
 from urllib3.exceptions import InsecureRequestWarning
 import re
 from langchain.prompts import PromptTemplate
-import os
 from langchain_groq import ChatGroq
-from dotenv import load_dotenv
-load_dotenv()
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -21,7 +18,7 @@ logger = logging.getLogger(__name__)
 def generate_related_keywords(keyword):
     """Generate related keywords using Groq LLM."""
     try:
-        groq_api_key = os.getenv('GROQ_API_KEY')
+        groq_api_key = st.secrets["GROQ_API_KEY"]  # Fetch API key from Streamlit secrets
         llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile")
         logger.info(f"Generating keywords for: {keyword}")
         
@@ -31,7 +28,7 @@ def generate_related_keywords(keyword):
         3. Keywords must be 2-5 words long.
         4. Exclude informational terms like "what," "how," or "why."
         5. Use Title Case formatting.
-        6. Ensure keywords are actionable and rank able.
+        6. Ensure keywords are actionable and rankable.
 
         BAD EXAMPLE (Avoid):
         - Doctor Qualifications
@@ -88,6 +85,7 @@ def generate_related_keywords(keyword):
         ]
         logger.info(f"Using default keywords due to error: {default_keywords}")
         return default_keywords
+
 
 def clean_text(text):
     """Clean and normalize text for consistent matching."""
