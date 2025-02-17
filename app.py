@@ -1,10 +1,9 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
-from modules.opportunities_finder import Home
+from modules.opportunities_finder import internal_linking_opportunities_finder
 from modules.url_extractor import link
 import hashlib
 from modules.reverse_silos import analyze_internal_links
-from modules.file_uploader import file_uploader_feature
 
 st.set_page_config(page_title="Internal Linking Opportunities", layout="wide")
 
@@ -210,8 +209,8 @@ def main():
             
             selected = option_menu(
                 'Main Menu',
-                ['URL Extractor', 'Keyword Analysis','Reverse Silos','File Uploader'],
-                icons=['house', 'list-check','crosshair','file-earmark-text'],
+                ['URL Extractor', 'Keyword Analysis','Reverse Silos'],
+                icons=['house', 'list-check','crosshair'],
                 default_index=0,
                 menu_icon="cast"
             )
@@ -223,11 +222,9 @@ def main():
         if selected == "URL Extractor":
             link()
         elif selected == "Keyword Analysis":
-            Home()
+            internal_linking_opportunities_finder()
         elif selected == "Reverse Silos":
             analyze_internal_links()
-        elif selected == "File Uploader":
-            file_uploader_feature()
-        
+    
 if __name__ == "__main__":
     main()

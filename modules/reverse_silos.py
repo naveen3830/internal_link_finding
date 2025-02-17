@@ -1,4 +1,3 @@
-import re
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -6,9 +5,6 @@ import streamlit as st
 from urllib.parse import urljoin, urlparse
 import numpy as np
 
-# =============================================================================
-# Session State Initialization (using setdefault)
-# =============================================================================
 default_keys = {
     "manual_homepage_url": "",
     "manual_target_page_url": "",
@@ -32,9 +28,6 @@ default_keys = {
 for key, default_value in default_keys.items():
     st.session_state.setdefault(key, default_value)
 
-# =============================================================================
-# Helper Functions
-# =============================================================================
 def is_valid_url(url):
     try:
         result = urlparse(url)
@@ -97,14 +90,8 @@ def get_main_content_anchor_tags(url, page_type):
         st.error(f"Error scraping {url}: {str(e)}")
         return []
 
-# =============================================================================
-# Analysis Execution Function
-# =============================================================================
 def run_analysis(data, source="manual"):
-    """
-    Runs the interlinking analysis. The `source` parameter should be either
-    "manual" or "file" so that the proper session state variables are updated.
-    """
+
     if source == "manual":
         st.session_state["manual_data"] = data
     else:
@@ -185,8 +172,7 @@ def run_analysis(data, source="manual"):
         else:
             return 'background-color: #FFCDD2; color: black'
         
-    font_family = ('system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", '
-                   'Roboto, "Helvetica Neue", Arial, sans-serif')
+    font_family = ('system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", ''Roboto, "Helvetica Neue", Arial, sans-serif')
     
     styled_matrix = (matrix_df
                     .style
@@ -237,9 +223,6 @@ def run_analysis(data, source="manual"):
         st.session_state["file_tooltip_df"] = tooltip_df
         st.session_state["file_styled_matrix_html"] = styled_matrix.to_html()
 
-# =============================================================================
-# Analysis Display Function (Uses Stored Results)
-# =============================================================================
 def display_analysis_results(source="manual"):
     """
     Displays analysis results. The `source` parameter should be "manual" or "file".
@@ -339,9 +322,6 @@ def display_analysis_results(source="manual"):
                 if missing_blogs:
                     st.error(f"Missing links to: {', '.join(missing_blogs)}")
 
-# =============================================================================
-# Tab: Manual Input
-# =============================================================================
 def manual_input_tab():
     st.subheader("Manual Input Analysis")
     col1, col2 = st.columns(2)
@@ -393,11 +373,8 @@ def manual_input_tab():
         run_analysis(data, source="manual")
         st.success("Manual analysis complete!")
 
-# =============================================================================
-# Tab: File Upload
-# =============================================================================
 def file_upload_tab():
-    st.subheader("File Upload Analysis")
+    st.subheader("Smart Internal Linking Analysis")
     st.warning(
         """File Requirements:
         - Must be an Excel or CSV file and contain the columns 'type' and 'url'
@@ -439,17 +416,39 @@ def file_upload_tab():
             if st.button("Start Analysis for the Uploaded File"):
                 run_analysis(data, source="file")
                 st.success("File upload analysis complete!")
-                # Removed direct call to display_analysis_results(source="file")
-        
+
         except Exception as e:
             st.error(f"Error reading file: {e}")
 
-# =============================================================================
-# Main App Function
-# =============================================================================
 def analyze_internal_links():
-    st.header("Reverse Content Silos Analysis", divider='rainbow')
+    st.header("Smart Internal Linking Analysis", divider='rainbow')
     
+    st.markdown("""
+    <style>
+        .stTabs [data-baseweb="tab"] {
+            height: 45px;
+            padding: 15px 25px;
+            font-size: 18px;
+            background-color: #f0f2f6;
+            border-radius: 10px 10px 0 0;
+            margin: 0 5px;
+            transition: all 0.3s ease;
+        }
+        .stTabs [data-baseweb="tab"]:hover {
+            background-color: #e1e3e7;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: #2e7d32 !important;
+            color: white !important;
+            font-weight: bold;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 5px;
+            padding: 10px 0;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
     with st.expander("Understanding Reverse Content Silos"):
         st.markdown("""
         Reverse content silos represent a strategic internal linking structure where supporting content pieces interlink with each other and point to a central target page. In this structure:
@@ -463,18 +462,17 @@ def analyze_internal_links():
         with col2:
             st.image(r"reverse_silos.png", caption="Reverse Content Silos Analysis", width=700)
     
-    # Create two tabs for Manual Input and File Upload.
-    tab1, tab2 = st.tabs(["Manual Input", "File Upload"])
+    # Create two tabs for User Input and File Upload.
+    tab1, tab2 = st.tabs(["User Input", "File Upload"])
     
     with tab1:
-        manual_input_tab()  # This collects manual input and runs analysis.
+        manual_input_tab()
         if st.session_state.get("manual_data") is not None:
             st.subheader("Manual Input Analysis Results")
             display_analysis_results(source="manual")
     
     with tab2:
-        file_upload_tab()  # This collects file upload input and runs analysis.
+        file_upload_tab()
         if st.session_state.get("file_data") is not None:
             st.subheader("File Upload Analysis Results")
             display_analysis_results(source="file")
-
