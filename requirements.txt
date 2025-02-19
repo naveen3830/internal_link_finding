@@ -1,9 +1,7 @@
 openpyxl
-scrapy
 futures
 asyncio
 aiohttp
-selenium
 pandas
 streamlit
 beautifulsoup4
@@ -12,10 +10,10 @@ webdriver-manager
 urllib3
 aiohttp
 asyncio
-streamlit_authenticator
 beautifulsoup4
 lxml
 nest_asyncio
 streamlit_option_menu
 langchain
 langchain-groq
+pdfkit

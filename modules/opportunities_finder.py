@@ -26,7 +26,7 @@ def extract_text_from_html(html_content):
     for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 'h1', 'h2', 'h3','h4','h5','h6']):
         element.decompose()
     # Remove specific unwanted classes
-    for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container", 
+    for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container", "nav-red","nav-label",
         "row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0",
     ]}):
         element.decompose()
@@ -290,7 +290,7 @@ def file_upload_internal_linking():
         elif st.session_state.get("uploaded_urls") is not None:
             df = st.session_state.uploaded_urls
 
-    st.subheader("Keyword-Target URL Pairs Upload")
+    st.subheader("Upload Keyword-Target URL Pairs")
     keyword_url_file = st.file_uploader(
         "Upload CSV/Excel with keyword-target URL pairs (must contain 'keyword' and 'target_url' columns)",
         type=["csv", "xlsx"],
