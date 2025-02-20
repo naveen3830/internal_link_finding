@@ -17,3 +17,4 @@ streamlit_option_menu
 langchain
 langchain-groq
 pdfkit
+platformdirs

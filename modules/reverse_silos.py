@@ -6,6 +6,7 @@ from urllib.parse import urljoin, urlparse
 import numpy as np
 import pdfkit
 import tempfile
+import platform
 import os
 
 default_keys = {
@@ -32,11 +33,19 @@ for key, default_value in default_keys.items():
     st.session_state.setdefault(key, default_value)
 
 def generate_pdf_report(html_content):
-    config = pdfkit.configuration(wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")
+    current_os = platform.system() 
+    if current_os == "Windows":
+        config = pdfkit.configuration(
+            wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+        )
+    else:
+        config = pdfkit.configuration(wkhtmltopdf="/usr/bin/wkhtmltopdf")
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
         pdfkit.from_string(html_content, tmpfile.name, configuration=config)
         tmpfile.seek(0)
         pdf_bytes = tmpfile.read()
+
     os.remove(tmpfile.name)
     return pdf_bytes
 
@@ -54,75 +63,154 @@ def create_detailed_report_html(source="manual"):
 
     homepage_url = data[data['type'] == 'Homepage']['url'].values[0]
     target_url = data[data['type'] == 'Target Page']['url'].values[0]
-    homepage_section = "<h3>Homepage Links Analysis</h3>"
+    homepage_section = ""
     homepage_links_df = pd.DataFrame(all_links.get('Homepage', []))
     if not homepage_links_df.empty:
         ht = homepage_links_df[homepage_links_df['url'] == target_url]
         if not ht.empty:
-            homepage_section += "<p style='color:green;'>✓ Homepage links to Target Page</p>"
+            homepage_section += "<p class='success'>✓ Homepage links to Target Page</p>"
         else:
-            homepage_section += "<p style='color:red;'>✗ Homepage does not link to Target Page</p>"
+            homepage_section += "<p class='error'>✗ Homepage does not link to Target Page</p>"
     else:
         homepage_section += "<p>No internal links found on the Homepage.</p>"
 
-    target_section = "<h3>Target Page Links Analysis</h3>"
+    target_section = ""
     target_links_df = pd.DataFrame(all_links.get('Target Page', []))
     if not target_links_df.empty:
         th = target_links_df[target_links_df['url'] == homepage_url]
         if not th.empty:
-            target_section += "<p style='color:green;'>✓ Target Page links to Homepage</p>"
+            target_section += "<p class='success'>✓ Target Page links to Homepage</p>"
         else:
-            target_section += "<p style='color:red;'>✗ Target Page does not link to Homepage</p>"
+            target_section += "<p class='error'>✗ Target Page does not link to Homepage</p>"
     else:
         target_section += "<p>No internal links found on the Target Page.</p>"
 
-    blog_section = "<h3>Blog Interlinking Analysis</h3>"
+    blog_section = ""
     blog_types = [typ for typ in data['type'] if typ.startswith('Blog')]
     for blog_type in blog_types:
-        blog_section += f"<h4>{blog_type} Analysis</h4>"
+        blog_section += f"<h3>{blog_type} Analysis</h3>"
         blog_links_df = pd.DataFrame(all_links.get(blog_type, []))
         if blog_links_df.empty:
-            blog_section += "<p style='color:orange;'>No internal links found in this blog.</p>"
+            blog_section += "<p class='warning'>No internal links found in this blog.</p>"
             continue
         blog_links_df['linked_type'] = blog_links_df['url'].map(url_to_type)
+
+        # Links to Target Page
         target_links = blog_links_df[blog_links_df['url'] == target_url]
         if not target_links.empty:
-            blog_section += "<p style='color:green;'>✓ Links to Target Page:</p>"
+            blog_section += "<p class='success'>✓ Links to Target Page:</p>"
             blog_section += target_links[['text', 'url']].to_html(index=False, border=1)
         else:
-            blog_section += "<p style='color:red;'>✗ Does not link to Target Page</p>"
+            blog_section += "<p class='error'>✗ Does not link to Target Page</p>"
 
+        # Links to other Blogs
         other_blogs = [b for b in blog_types if b != blog_type]
         other_blog_links = blog_links_df[blog_links_df['linked_type'].isin(other_blogs)]
         if not other_blog_links.empty:
             blog_section += "<p>Links to Other Blogs:</p>"
             blog_section += other_blog_links[['text', 'url', 'linked_type']].to_html(index=False, border=1)
+
+        # Check for missing blog links
         missing_blogs = [
             b for b in other_blogs 
             if data[data['type'] == b]['url'].values[0] not in other_blog_links['url'].tolist()
         ]
         if missing_blogs:
-            blog_section += f"<p style='color:red;'>Missing links to: {', '.join(missing_blogs)}</p>"
+            blog_section += f"<p class='error'>Missing links to: {', '.join(missing_blogs)}</p>"
 
     full_html = f"""
     <html>
       <head>
         <meta charset="utf-8">
         <title>Internal Link Analysis Report</title>
+        <style>
+          body {{
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            margin: 30px;
+            line-height: 1.6;
+            color: #333;
+          }}
+          h1, h2, h3, h4 {{
+            color: #2e7d32;
+            margin-top: 1.2em;
+            margin-bottom: 0.8em;
+          }}
+          .subtitle {{
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 2em;
+          }}
+          table {{
+            border-collapse: collapse;
+            margin-bottom: 1em;
+          }}
+          table, th, td {{
+            border: 1px solid #999;
+          }}
+          th, td {{
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 14px;
+          }}
+          .success {{
+            color: green;
+            font-weight: bold;
+          }}
+          .error {{
+            color: red;
+            font-weight: bold;
+          }}
+          .warning {{
+            color: orange;
+            font-weight: bold;
+          }}
+          .matrix-container {{
+            margin-bottom: 2em;
+          }}
+          .analysis-container {{
+            margin-bottom: 2em;
+          }}
+          .section-divider {{
+            margin: 2em 0;
+            border: 0;
+            border-top: 2px solid #ccc;
+          }}
+        </style>
       </head>
       <body>
-        <h2>Internal Link Analysis Report ({source.capitalize()})</h2>
-        <p>This report contains your complete interlinking matrix and detailed analysis of Homepage, Target Page, and Blog links.</p>
-        <h3>Complete Interlinking Matrix</h3>
-        {matrix_html}
-        {homepage_section}
-        {target_section}
-        {blog_section}
+        <h1 style="text-align:center;">Internal Link Analysis Report ({source.capitalize()})</h1>
+        <p class="subtitle">
+          This report contains your complete interlinking matrix and detailed analysis 
+          of Homepage, Target Page, and Blog links.
+        </p>
+        
+        <div class="matrix-container">
+          <h2>Complete Interlinking Matrix</h2>
+          {matrix_html}
+        </div>
+        <hr class="section-divider" />
+
+        <div class="analysis-container">
+          <h2>Homepage Links Analysis</h2>
+          {homepage_section}
+        </div>
+        <hr class="section-divider" />
+
+        <div class="analysis-container">
+          <h2>Target Page Links Analysis</h2>
+          {target_section}
+        </div>
+        <hr class="section-divider" />
+
+        <div class="analysis-container">
+          <h2>Blog Interlinking Analysis</h2>
+          {blog_section}
+        </div>
+        <hr class="section-divider" />
       </body>
     </html>
     """
     return full_html
-
 
 def is_valid_url(url):
     try:
@@ -145,8 +233,6 @@ def get_main_content_anchor_tags(url, page_type):
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Remove unwanted elements
         for element in soup.find_all([
             'script', 'style', 'nav', 'header', 'footer', 
             'meta', 'link', 'sidebar', 'aside', '.nav', 
