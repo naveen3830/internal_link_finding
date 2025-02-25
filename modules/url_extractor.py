@@ -112,11 +112,7 @@ def link():
             st.subheader("📊 Results Overview")
             
             with st.expander("🔍 View Raw Data", expanded=True):
-                st.dataframe(
-                    st.session_state.lang_df,
-                    use_container_width=True,
-                    height=300
-                )
+                st.dataframe(st.session_state.lang_df,use_container_width=True,height=300)
 
             unique_languages = st.session_state.lang_df['Language/Category'].dropna().unique().tolist()
             # Default selection: only 'en' and common category labels.
@@ -135,11 +131,7 @@ def link():
             st.success(f"**✅ Found {len(filtered_df)} URLs matching selected languages/categories!**")
             
             with st.expander("📑 Preview Filtered Results"):
-                st.dataframe(
-                    filtered_df,
-                    use_container_width=True,
-                    height=250
-                )
+                st.dataframe(filtered_df,use_container_width=True,height=250)
 
             st.markdown("---")
             st.subheader("💾 Download Results")

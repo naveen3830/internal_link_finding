@@ -8,10 +8,10 @@ import logging
 from urllib3.exceptions import InsecureRequestWarning
 import re
 
+# Disable warnings
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 def clean_text(text):
     if not text:
@@ -23,12 +23,10 @@ def clean_text(text):
 def extract_text_from_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     # Remove unwanted tags
-    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 'h1', 'h2', 'h3','h4','h5','h6']):
+    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 
+                                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
         element.decompose()
-    # Remove specific unwanted classes
-    for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container", "nav-red","nav-label",
-        "row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0",
-    ]}):
+    for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container","nav-red", "nav-label","row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0","css-xzv94c e108hv3e5"]}):
         element.decompose()
     return soup
 
@@ -55,17 +53,22 @@ def find_unlinked_keywords(soup, keyword, target_url):
             cleaned_sentence = clean_text(sentence)
             matches = re.findall(pattern, cleaned_sentence)
             if matches:
-                for _ in matches:
-                    unlinked_occurrences.append({
-                        'context': sentence.strip(),
-                        'keyword': keyword,
-                        'target_url': target_url
-                    })
+                unlinked_occurrences.append({
+                    'context': sentence.strip(),
+                    'keyword': keyword,
+                    'target_url': target_url
+                })
     
     return unlinked_occurrences
 
+def standardize_url(url):
+    url = url.strip()
+    if url.startswith("www."):
+        url = "https://" + url
+    return url
+
 def process_url(url, keyword, target_url):
-    # Skip if the URL is the target itself
+    url = standardize_url(url)
     if url.strip().rstrip('/') == target_url.strip().rstrip('/'):
         return None
     try:
@@ -95,6 +98,7 @@ def process_url(url, keyword, target_url):
 @st.cache_data
 def convert_df_to_csv(download_data):
     download_df = pd.DataFrame(download_data)
+    download_df.drop_duplicates(subset=['context'], inplace=True)
     return download_df.to_csv(index=False).encode('utf-8')
 
 def manual_input_internal_linking():
@@ -111,20 +115,21 @@ def manual_input_internal_linking():
                 st.session_state[var] = False
 
     df = None
-    # Use previously filtered data if available; otherwise, let the user upload a file
     if 'filtered_df' in st.session_state and st.session_state.filtered_df is not None:
         st.success("Using filtered data from the previous tab.")
         df = st.session_state.filtered_df
     else:
         uploaded_file = st.file_uploader("Upload CSV or Excel file with URLs",
-                                         type=["csv", "xlsx"],
-                                         key="url_file_uploader_manual")
+                                        type=["csv", "xlsx"],
+                                        key="url_file_uploader_manual")
         if uploaded_file:
             try:
                 if uploaded_file.name.endswith(".csv"):
                     df = pd.read_csv(uploaded_file)
                 else:
                     df = pd.read_excel(uploaded_file)
+                df.columns = df.columns.str.strip().str.lower()
+                st.write("Loaded data:", df.head())
                 st.session_state.uploaded_df = df
             except Exception as e:
                 st.error(f"An error occurred while reading the file: {str(e)}")
@@ -135,7 +140,6 @@ def manual_input_internal_linking():
                                 key='num_pairs_input_manual')
     st.session_state.num_pairs = num_pairs
 
-    # Ensure we have enough input fields
     for inputs in ['keyword_inputs', 'target_url_inputs']:
         if len(st.session_state[inputs]) < num_pairs:
             st.session_state[inputs] += [''] * (num_pairs - len(st.session_state[inputs]))
@@ -164,19 +168,22 @@ def manual_input_internal_linking():
     max_workers = st.slider("Concurrent searches", min_value=1, max_value=15, value=15,
                             help="Number of URLs to process simultaneously", key="slider_manual")
 
-    if st.button("Process URLs",key="process_button_manual"):
+    if st.button("Process URLs", key="process_button_manual"):
         keyword_url_pairs = [(k.strip(), u.strip()) 
-                             for k, u in zip(keyword_inputs, target_url_inputs) 
-                             if k.strip() and u.strip()]
+                            for k, u in zip(keyword_inputs, target_url_inputs) 
+                            if k.strip() and u.strip()]
         if df is not None and keyword_url_pairs:
             try:
                 if 'source_url' not in df.columns:
                     st.error("File must contain a 'source_url' column")
                     return
-
+                
                 df['source_url'] = df['source_url'].astype(str).str.strip()
-                valid_urls = df['source_url'].str.match(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
+                url_regex = r'^(https?://|www\.)[^\s<>"]+'
+                valid_urls = df['source_url'].str.match(url_regex)
                 df = df[valid_urls].copy()
+                
+                df['source_url'] = df['source_url'].apply(standardize_url)
 
                 if df.empty:
                     st.error("No valid URLs found in the file")
@@ -270,19 +277,19 @@ def file_upload_internal_linking():
                     df = pd.read_csv(uploaded_file)
                 else:
                     df = pd.read_excel(uploaded_file)
-                
+                df.columns = df.columns.str.strip().str.lower()
+                st.write("Loaded source URLs:", df.head())
                 if 'source_url' not in df.columns:
                     st.error("File must contain a 'source_url' column")
                     return
-                
                 df['source_url'] = df['source_url'].astype(str).str.strip()
-                valid_urls = df['source_url'].str.match(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
+                url_regex = r'^(https?://|www\.)[^\s<>"]+'
+                valid_urls = df['source_url'].str.match(url_regex)
                 df = df[valid_urls].copy()
-                
+                df['source_url'] = df['source_url'].apply(standardize_url)
                 if df.empty:
                     st.error("No valid URLs found in the file")
                     return
-                
                 st.session_state.uploaded_urls = df
             except Exception as e:
                 st.error(f"Error reading source URLs file: {str(e)}")
@@ -304,7 +311,7 @@ def file_upload_internal_linking():
                 keyword_url_df = pd.read_csv(keyword_url_file)
             else:
                 keyword_url_df = pd.read_excel(keyword_url_file)
-            
+            keyword_url_df.columns = keyword_url_df.columns.str.strip().str.lower()
             if not {'keyword', 'target_url'}.issubset(keyword_url_df.columns):
                 st.error("File must contain both 'keyword' and 'target_url' columns")
                 return
@@ -334,7 +341,7 @@ def file_upload_internal_linking():
         key="slider_file"
     )
 
-    if st.button("Process URLs",key="process_urls"):
+    if st.button("Process URLs", key="process_urls"):
         if df is None or keyword_url_df is None:
             st.error("Please provide both source URLs and keyword-target URL pairs files")
             return

@@ -32,12 +32,31 @@ default_keys = {
 for key, default_value in default_keys.items():
     st.session_state.setdefault(key, default_value)
 
+def inject_custom_css():
+    st.markdown(
+        """
+        <style>
+        h1, h2, h3, h4 {
+            color: black !important;
+            font-weight: bold !important;
+        }
+        .error {
+            color: #B71C1C !important;
+            font-weight: bold !important;
+        }
+        table, th, td {
+            border: 2px solid black !important;
+            text-align: center !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
 def generate_pdf_report(html_content):
     current_os = platform.system() 
     if current_os == "Windows":
-        config = pdfkit.configuration(
-            wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
-        )
+        config = pdfkit.configuration(wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")
     else:
         config = pdfkit.configuration(wkhtmltopdf="/usr/bin/wkhtmltopdf")
 
@@ -110,9 +129,8 @@ def create_detailed_report_html(source="manual"):
             blog_section += "<p>Links to Other Blogs:</p>"
             blog_section += other_blog_links[['text', 'url', 'linked_type']].to_html(index=False, border=1)
 
-        # Check for missing blog links
         missing_blogs = [
-            b for b in other_blogs 
+            b for b in other_blogs   
             if data[data['type'] == b]['url'].values[0] not in other_blog_links['url'].tolist()
         ]
         if missing_blogs:
@@ -120,94 +138,107 @@ def create_detailed_report_html(source="manual"):
 
     full_html = f"""
     <html>
-      <head>
+    <head>
         <meta charset="utf-8">
         <title>Internal Link Analysis Report</title>
         <style>
-          body {{
+        body {{
             font-family: "Helvetica Neue", Arial, sans-serif;
             margin: 30px;
             line-height: 1.6;
             color: #333;
-          }}
-          h1, h2, h3, h4 {{
-            color: #2e7d32;
+        }}
+        
+        h1, h2, h3, h4 {{
+            color: black;
+            font-weight: bold;
             margin-top: 1.2em;
             margin-bottom: 0.8em;
-          }}
-          .subtitle {{
+        }}
+        
+        .subtitle {{
             font-size: 16px;
             color: #555;
             margin-bottom: 2em;
-          }}
-          table {{
+        }}
+            
+        table {{
             border-collapse: collapse;
             margin-bottom: 1em;
-          }}
-          table, th, td {{
+        }}
+        
+        table, th, td {{
             border: 1px solid #999;
-          }}
-          th, td {{
+            border: 2px solid black !important;
+        }}
+            
+        th, td {{
             padding: 8px 12px;
-            text-align: left;
+            text-align: center;
             font-size: 14px;
-          }}
-          .success {{
+        }}
+            
+        .success {{
             color: green;
             font-weight: bold;
-          }}
-          .error {{
-            color: red;
+        }}
+            
+        .error {{
+            color: #B71C1C;
             font-weight: bold;
-          }}
-          .warning {{
+        }}
+            
+        .warning {{
             color: orange;
             font-weight: bold;
-          }}
-          .matrix-container {{
+        }}
+            
+        .matrix-container {{
             margin-bottom: 2em;
-          }}
-          .analysis-container {{
+        }}
+            
+        .analysis-container {{
             margin-bottom: 2em;
-          }}
-          .section-divider {{
+        }}
+            
+        .section-divider {{
             margin: 2em 0;
             border: 0;
             border-top: 2px solid #ccc;
-          }}
+        }}
         </style>
-      </head>
-      <body>
-        <h1 style="text-align:center;">Internal Link Analysis Report ({source.capitalize()})</h1>
+    </head>
+    <body>
+        <h1 style="text-align:center;">Internal Link Analysis Report</h1>
         <p class="subtitle">
-          This report contains your complete interlinking matrix and detailed analysis 
-          of Homepage, Target Page, and Blog links.
+        This report contains your complete interlinking matrix and detailed analysis 
+        of Homepage, Target Page, and Blog links.
         </p>
         
         <div class="matrix-container">
-          <h2>Complete Interlinking Matrix</h2>
-          {matrix_html}
+        <h2>Complete Interlinking Matrix</h2>
+        {matrix_html}
         </div>
         <hr class="section-divider" />
 
         <div class="analysis-container">
-          <h2>Homepage Links Analysis</h2>
-          {homepage_section}
+        <h2>Homepage Links Analysis</h2>
+        {homepage_section}
         </div>
         <hr class="section-divider" />
 
         <div class="analysis-container">
-          <h2>Target Page Links Analysis</h2>
-          {target_section}
+        <h2>Target Page Links Analysis</h2>
+        {target_section}
         </div>
         <hr class="section-divider" />
 
         <div class="analysis-container">
-          <h2>Blog Interlinking Analysis</h2>
-          {blog_section}
+        <h2>Blog Interlinking Analysis</h2>
+        {blog_section}
         </div>
         <hr class="section-divider" />
-      </body>
+    </body>
     </html>
     """
     return full_html
@@ -277,7 +308,6 @@ def get_main_content_anchor_tags(url, page_type):
         return []
 
 def run_analysis(data, source="manual"):
-    """Run internal link analysis and store results in session_state."""
     if source == "manual":
         st.session_state["manual_data"] = data
     else:
@@ -336,7 +366,7 @@ def run_analysis(data, source="manual"):
         tooltip_data.append(tooltip_row)
     tooltip_df = pd.DataFrame(tooltip_data, index=matrix_df.index, columns=matrix_df.columns)
     
-    # Style
+    # Style for the matrix (this styling is used to generate the HTML for both PDF and Streamlit)
     tooltip_style = [
         ('visibility', 'hidden'),
         ('position', 'absolute'),
@@ -357,10 +387,10 @@ def run_analysis(data, source="manual"):
         elif val == 1:
             return 'background-color: #C8E6C9; color: black'
         else:
-            return 'background-color: #FFCDD2; color: black'
-        
-    font_family = ('system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", '
-                   'Roboto, "Helvetica Neue", Arial, sans-serif')
+            return 'background-color: #FA615A; color: white'
+
+    font_family = ('system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",'
+                'Roboto, "Helvetica Neue", Arial, sans-serif')
     
     styled_matrix = (matrix_df
         .style
@@ -415,6 +445,7 @@ def run_analysis(data, source="manual"):
         st.session_state["file_styled_matrix_html"] = styled_matrix.to_html()
 
 def display_analysis_results(source="manual"):
+    inject_custom_css()
 
     if source == "manual":
         if (st.session_state.get("manual_data") is None or
@@ -444,7 +475,6 @@ def display_analysis_results(source="manual"):
     st.markdown(styled_matrix_html, unsafe_allow_html=True)
     
     st.divider()
-    # Single expander for Homepage & Target Page
     if ('Homepage' in data['type'].values and 'Target Page' in data['type'].values
         and 'Homepage' in matrix_df.index and 'Target Page' in matrix_df.columns):
         
@@ -721,11 +751,9 @@ def analyze_internal_links():
     with tab1:
         manual_input_tab()
         if st.session_state.get("manual_data") is not None:
-            st.subheader("Manual Input Analysis Results")
             display_analysis_results(source="manual")
     
     with tab2:
         file_upload_tab()
         if st.session_state.get("file_data") is not None:
-            st.subheader("File Upload Analysis Results")
             display_analysis_results(source="file")
