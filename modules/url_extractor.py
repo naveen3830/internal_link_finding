@@ -1,11 +1,9 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 import pandas as pd
-import xml.etree.ElementTree as ET
 import re
-from urllib.parse import urlparse
 
 def link():
     st.markdown("""
@@ -114,17 +112,15 @@ def link():
             st.subheader("📊 Results Overview")
             
             with st.expander("🔍 View Raw Data", expanded=True):
-                st.dataframe(
-                    st.session_state.lang_df,
-                    use_container_width=True,
-                    height=300
-                )
+                st.dataframe(st.session_state.lang_df,use_container_width=True,height=300)
 
             unique_languages = st.session_state.lang_df['Language/Category'].dropna().unique().tolist()
+            # Default selection: only 'en' and common category labels.
+            default_options = ['en', 'blogs', 'corporate', 'how-to', 'products', 'resources', 'company', 'partners', 'solutions']
             selected_languages = st.multiselect(
                 "**Filter by Detected Languages/Categories:**",
                 unique_languages, 
-                default=unique_languages,
+                default=[opt for opt in default_options if opt in unique_languages],
                 help="Select which language/category to keep",
                 key='language_selector'
             )
@@ -135,11 +131,7 @@ def link():
             st.success(f"**✅ Found {len(filtered_df)} URLs matching selected languages/categories!**")
             
             with st.expander("📑 Preview Filtered Results"):
-                st.dataframe(
-                    filtered_df,
-                    use_container_width=True,
-                    height=250
-                )
+                st.dataframe(filtered_df,use_container_width=True,height=250)
 
             st.markdown("---")
             st.subheader("💾 Download Results")
@@ -205,14 +197,15 @@ def detect_url_language(url):
         'zh': [r'/zh/', r'/zh-', r'/zhs/', r'/chinese/', r'/cn/', r'/hk/', r'/tw/', r'/zh-cn/', r'/zh-tw/', r'/zh-hk/', r'/zht/'],
         'ko': [r'/ko/', r'/ko-', r'/korean/', r'/kr/'],
         'ar': [r'/ar/', r'/ar-', r'/arabic/', r'/sa/', r'/ae/'],
-        'blogs': [r'/blogs/',r'/blogs-',r'/en/blogs/',r'/blog/'],
-        'corporate': [r'/corporate/',r'/corporate-',r'/en/corporate/',r'/corp/'],
-        'how-to': [r'/how-to/',r'/how-to-',r'/en/how-to/',r'/howto/'],
-        'products': [r'/products/','/products-'],
-        'resources': [r'/resources/','/resources-'],
-        'company': [r'/company/','/company-'],
-        'partners': [r'/partners/','/partners-'],
-        'solutions': [r'/solutions/','/solutions-'],
+        # Categories 
+        'blogs': [r'/blogs/', r'/blogs-', r'/en/blogs/', r'/blog/'],
+        'corporate': [r'/corporate/', r'/corporate-', r'/en/corporate/', r'/corp/'],
+        'how-to': [r'/how-to/', r'/how-to-', r'/en/how-to/', r'/howto/'],
+        'products': [r'/products/', r'/products-'],
+        'resources': [r'/resources/', r'/resources-'],
+        'company': [r'/company/', r'/company-'],
+        'partners': [r'/partners/', r'/partners-'],
+        'solutions': [r'/solutions/', r'/solutions-'],
     }
 
     specific_domain_patterns = {
@@ -254,14 +247,14 @@ def detect_url_language(url):
     return 'en'
 
 def fetch_sitemap_urls(website_url):
-    sitemap_paths = ["/sitemap.xml","/sitemap_index.xml", "/sitemap-1.xml","/sitemaps/sitemap.xml","/sitemaps/sitemap_index.xml"]
+    sitemap_paths = ["/sitemap.xml", "/sitemap_index.xml", "/sitemap-1.xml", "/sitemaps/sitemap.xml", "/sitemaps/sitemap_index.xml"]
     base_url = website_url.rstrip('/')
     all_urls = []
 
     for path in sitemap_paths:
         sitemap_url = base_url + path
         try:
-            response = requests.get(sitemap_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
+            response = requests.get(sitemap_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
             if response.status_code == 200:
                 sitemap_urls = parse_sitemap_index(response.text, base_url)
                 if not sitemap_urls:
@@ -284,7 +277,7 @@ def parse_sitemap_index(sitemap_content, base_url):
                 if not nested_sitemap_url.startswith('http'):
                     nested_sitemap_url = urljoin(base_url, nested_sitemap_url)
                 try:
-                    nested_response = requests.get(nested_sitemap_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
+                    nested_response = requests.get(nested_sitemap_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
                     if nested_response.status_code == 200:
                         nested_urls = parse_sitemap(nested_response.text)
                         all_urls.extend(nested_urls)
