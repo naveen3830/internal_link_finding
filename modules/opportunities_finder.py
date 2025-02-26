@@ -220,37 +220,39 @@ def manual_input_internal_linking():
         else:
             st.warning("Please provide all inputs and ensure valid data is available.")
             
-    if st.session_state.get("processed_results"):
-        download_data = []
-        matched_urls = len({res['url'] for res in st.session_state.processed_results})
-        st.success(f"Found {len(st.session_state.processed_results)} opportunities across {matched_urls} URLs")
+    if st.session_state.processing_done:
+        if st.session_state.processed_results:
+            download_data = []
+            matched_urls = len({res['url'] for res in st.session_state.processed_results})
+            st.success(f"Found {len(st.session_state.processed_results)} opportunities across {matched_urls} URLs")
 
-        with st.expander("View Opportunities", expanded=True):
-            for result in st.session_state.processed_results:
-                st.write("---")
-                st.write(f"🔗 Source URL: {result['url']}")
-                if result.get('unlinked_matches'):
-                    st.write("Unlinked Keyword Occurrences:")
-                    for match in result['unlinked_matches']:
-                        st.markdown(f"- *{match['keyword']}* → {match['target_url']}")
-                        st.markdown(f"  Context: _{match['context']}_")
-                        download_data.append({
-                            'source_url': result['url'],
-                            'keyword': match['keyword'],
-                            'target_url': match['target_url'],
-                            'context': match['context']
-                        })
-
-        if download_data:
-            csv = convert_df_to_csv(download_data)
-            st.download_button(
-                label="Download Opportunities CSV",
-                data=csv,
-                file_name='unlinked_keyword_opportunities.csv',
-                mime='text/csv',
-                key='download_opportunities_csv'
-            )
-        elif st.session_state.processing_done and not st.session_state.get("processed_results"):
+            with st.expander("View Opportunities", expanded=True):
+                for result in st.session_state.processed_results:
+                    st.write("---")
+                    st.write(f"🔗 Source URL: {result['url']}")
+                    if result.get('unlinked_matches'):
+                        st.write("Unlinked Keyword Occurrences:")
+                        for match in result['unlinked_matches']:
+                            st.markdown(f"- *{match['keyword']}* → {match['target_url']}")
+                            st.markdown(f"  Context: _{match['context']}_")
+                            download_data.append({
+                                'source_url': result['url'],
+                                'keyword': match['keyword'],
+                                'target_url': match['target_url'],
+                                'context': match['context']
+                            })
+            if download_data:
+                csv = convert_df_to_csv(download_data)
+                st.download_button(
+                    label="Download Opportunities CSV",
+                    data=csv,
+                    file_name='unlinked_keyword_opportunities.csv',
+                    mime='text/csv',
+                    key='download_opportunities_csv'
+                )
+            else:
+                st.info("No interlinking opportunities found.")
+        else:
             st.info("No interlinking opportunities found.")
 
 def file_upload_internal_linking():
@@ -377,10 +379,12 @@ def file_upload_internal_linking():
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
-    if st.session_state.get("search_results"):
-        download_data = []
-        matched_urls = len({res['url'] for res in st.session_state.search_results})
-        st.success(f"Found {len(st.session_state.search_results)} opportunities across {matched_urls} URLs")
+    if st.session_state.completed_processing:
+        if st.session_state.search_results:
+            download_data = []
+            matched_urls = len({res['url'] for res in st.session_state.search_results})
+            st.success(f"Found {len(st.session_state.search_results)} opportunities across {matched_urls} URLs")
+
         with st.expander("View Opportunities", expanded=True):
             for result in st.session_state.search_results:
                 st.write("---")
@@ -405,8 +409,10 @@ def file_upload_internal_linking():
                 mime='text/csv',
                 key='download_csv'
             )
-        elif st.session_state.completed_processing and not st.session_state.get("search_results"):
+        else:
             st.info("No interlinking opportunities found.")
+    else:
+        st.info("No interlinking opportunities found.")
 
 def internal_linking_opportunities_finder():
     st.markdown("""
