@@ -740,11 +740,11 @@ def analyze_internal_links():
         - Supporting articles link to each other to share authority
         - All supporting content points to a main target page
         - The target page connects with the homepage
-        - Each supporting article can receive external backlinks
+        - Each supporting article can receive external back links
         """)
         col1, col2, col3 = st.columns([0.4, 2, 0.6])
         with col2:
-            st.image(r"reverse_silos.png", caption="Reverse Content Silos Analysis", width=700)
+            st.image(r"reverse_silos1.png", caption="Reverse Content Silos Analysis", width=600)
     
     tab1, tab2 = st.tabs(["User Input", "File Upload"])
     
