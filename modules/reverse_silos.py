@@ -114,7 +114,6 @@ def create_detailed_report_html(source="manual"):
             continue
         blog_links_df['linked_type'] = blog_links_df['url'].map(url_to_type)
 
-        # Links to Target Page
         target_links = blog_links_df[blog_links_df['url'] == target_url]
         if not target_links.empty:
             blog_section += "<p class='success'>✓ Links to Target Page:</p>"
@@ -122,7 +121,6 @@ def create_detailed_report_html(source="manual"):
         else:
             blog_section += "<p class='error'>✗ Does not link to Target Page</p>"
 
-        # Links to other Blogs
         other_blogs = [b for b in blog_types if b != blog_type]
         other_blog_links = blog_links_df[blog_links_df['linked_type'].isin(other_blogs)]
         if not other_blog_links.empty:
@@ -326,7 +324,6 @@ def run_analysis(data, source="manual"):
         page_links = get_main_content_anchor_tags(row['url'], row['type'])
         all_links[row['type']] = page_links
     
-    # Build adjacency matrix
     matrix_data = np.zeros((len(data), len(data)))
     for i, source_row in data.iterrows():
         source_links = all_links[source_row['type']]
@@ -341,14 +338,16 @@ def run_analysis(data, source="manual"):
         index=data['type']
     ).rename_axis(None, axis=1).rename_axis(None, axis=0)
     np.fill_diagonal(matrix_df.values, np.nan)
-    
-    # If there are blog types, set blog <-> homepage to NaN
+
     blog_types = [typ for typ in matrix_df.columns if typ.startswith('Blog')]
     if blog_types:
         matrix_df.loc['Homepage', blog_types] = np.nan
         matrix_df.loc[blog_types, 'Homepage'] = np.nan
-    
-    # Build tooltip data
+
+    if len(blog_types) > 1:
+        for btype in blog_types[1:]:
+            matrix_df.loc['Target Page', btype] = np.nan
+
     tooltip_data = []
     for i, source_type in enumerate(matrix_df.index):
         tooltip_row = []
@@ -390,7 +389,7 @@ def run_analysis(data, source="manual"):
             return 'background-color: #FA615A; color: white'
 
     font_family = ('system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",'
-                'Roboto, "Helvetica Neue", Arial, sans-serif')
+                   'Roboto, "Helvetica Neue", Arial, sans-serif')
     
     styled_matrix = (matrix_df
         .style
@@ -471,7 +470,7 @@ def display_analysis_results(source="manual"):
     # Full Matrix
     st.divider()
     st.subheader("Complete Interlinking Matrix")
-    st.write("In the below matrix 1 indicates a link exists, 0 indicates no link, and NA indicates not applicable (self-link)")
+    st.write("In the below matrix 1 indicates a link exists, 0 indicates no link, and NA indicates not applicable (self-link).")
     st.markdown(styled_matrix_html, unsafe_allow_html=True)
     
     st.divider()
@@ -548,7 +547,6 @@ def display_analysis_results(source="manual"):
                         if page not in target_links_df['linked_type'].values:
                             missing.append(page)
                     
-                    # Use the same "Missing links to: X" style:
                     if missing:
                         st.error(f"Missing links to: {', '.join(missing)}")
 
