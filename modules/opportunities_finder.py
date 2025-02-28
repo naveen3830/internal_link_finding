@@ -29,7 +29,7 @@ def extract_text_from_html(html_content):
     for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container","nav-red", "nav-label","row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0","css-xzv94c e108hv3e5"]}):
         element.decompose()
     return soup
-
+    
 def find_unlinked_keywords(soup, keyword, target_url):
     keyword = keyword.strip()
     cleaned_keyword = clean_text(keyword)
@@ -98,7 +98,6 @@ def process_url(url, keyword, target_url):
 @st.cache_data
 def convert_df_to_csv(download_data):
     download_df = pd.DataFrame(download_data)
-    download_df.drop_duplicates(subset=['context'], inplace=True)
     return download_df.to_csv(index=False).encode('utf-8')
 
 def manual_input_internal_linking():
