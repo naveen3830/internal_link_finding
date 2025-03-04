@@ -222,24 +222,35 @@ def manual_input_internal_linking():
     if st.session_state.processing_done:
         if st.session_state.processed_results:
             download_data = []
-            matched_urls = len({res['url'] for res in st.session_state.processed_results})
-            st.success(f"Found {len(st.session_state.processed_results)} opportunities across {matched_urls} URLs")
+            
+            for result in st.session_state.processed_results:
+                if result.get('unlinked_matches'):
+                    for match in result['unlinked_matches']:
+                        download_data.append({
+                            'source_url': result['url'],
+                            'keyword': match['keyword'],
+                            'target_url': match['target_url'],
+                            'context': match['context']
+                        })
+
+            num_opportunities = len(download_data)
+            matched_urls = len({item['source_url'] for item in download_data})
+            st.success(f"Found {num_opportunities} opportunities across {matched_urls} URLs")
 
             with st.expander("View Opportunities", expanded=True):
-                for result in st.session_state.processed_results:
+                from collections import defaultdict
+                grouped_data = defaultdict(list)
+                for item in download_data:
+                    grouped_data[item['source_url']].append(item)
+
+                for url, items in grouped_data.items():
                     st.write("---")
-                    st.write(f"🔗 Source URL: {result['url']}")
-                    if result.get('unlinked_matches'):
-                        st.write("Unlinked Keyword Occurrences:")
-                        for match in result['unlinked_matches']:
-                            st.markdown(f"- *{match['keyword']}* → {match['target_url']}")
-                            st.markdown(f"  Context: _{match['context']}_")
-                            download_data.append({
-                                'source_url': result['url'],
-                                'keyword': match['keyword'],
-                                'target_url': match['target_url'],
-                                'context': match['context']
-                            })
+                    st.write(f"🔗 **Source URL**: {url}")
+                    st.write("Unlinked Keyword Occurrences:")
+                    for match_info in items:
+                        st.markdown(f"- *{match_info['keyword']}* → {match_info['target_url']}")
+                        st.markdown(f"  Context: _{match_info['context']}_")
+
             if download_data:
                 csv = convert_df_to_csv(download_data)
                 st.download_button(
@@ -372,6 +383,7 @@ def file_upload_internal_linking():
             progress_bar.empty()
             duration = time.time() - start_time
             st.info(f"Search completed in {duration:.2f} seconds")
+
             st.session_state.search_results = results if results else None
             st.session_state.completed_processing = True
 
@@ -381,37 +393,47 @@ def file_upload_internal_linking():
     if st.session_state.completed_processing:
         if st.session_state.search_results:
             download_data = []
-            matched_urls = len({res['url'] for res in st.session_state.search_results})
-            st.success(f"Found {len(st.session_state.search_results)} opportunities across {matched_urls} URLs")
-
-        with st.expander("View Opportunities", expanded=True):
             for result in st.session_state.search_results:
-                st.write("---")
-                st.write(f"🔗 Source URL: {result['url']}")
                 if result.get('unlinked_matches'):
-                    st.write("Unlinked Keyword Occurrences:")
                     for match in result['unlinked_matches']:
-                        st.markdown(f"- *{match['keyword']}* → {match['target_url']}")
-                        st.markdown(f"  Context: _{match['context']}_")
                         download_data.append({
                             'source_url': result['url'],
                             'keyword': match['keyword'],
                             'target_url': match['target_url'],
                             'context': match['context']
                         })
-        if download_data:
-            csv = convert_df_to_csv(download_data)
-            st.download_button(
-                label="Download Opportunities CSV",
-                data=csv,
-                file_name='unlinked_keyword_opportunities.csv',
-                mime='text/csv',
-                key='download_csv'
-            )
+            
+            num_opportunities = len(download_data)
+            matched_urls = len({item['source_url'] for item in download_data})
+            st.success(f"Found {num_opportunities} opportunities across {matched_urls} URLs")
+
+            if num_opportunities > 0:
+                with st.expander("View Opportunities", expanded=True):
+                    from collections import defaultdict
+                    grouped_data = defaultdict(list)
+                    for item in download_data:
+                        grouped_data[item['source_url']].append(item)
+
+                    for url, items in grouped_data.items():
+                        st.write("---")
+                        st.write(f"🔗 Source URL: {url}")
+                        st.write("Unlinked Keyword Occurrences:")
+                        for match_info in items:
+                            st.markdown(f"- *{match_info['keyword']}* → {match_info['target_url']}")
+                            st.markdown(f"  Context: _{match_info['context']}_")
+
+                csv = convert_df_to_csv(download_data)
+                st.download_button(
+                    label="Download Opportunities CSV",
+                    data=csv,
+                    file_name='unlinked_keyword_opportunities.csv',
+                    mime='text/csv',
+                    key='download_csv'
+                )
+            else:
+                st.info("No interlinking opportunities found.")
         else:
             st.info("No interlinking opportunities found.")
-    else:
-        st.info("No interlinking opportunities found.")
 
 def internal_linking_opportunities_finder():
     st.markdown("""
