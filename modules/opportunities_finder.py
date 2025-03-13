@@ -23,14 +23,15 @@ def clean_text(text):
 
 def extract_text_from_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
-
-    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 
-                                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+    # Remove unwanted tags for content analysis
+    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link','h1', 'h2', 'h3', 'h4', 'h5', 'h6','li','ul','strong']):
         element.decompose()
-    for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container","nav-red", "nav-label","row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0","css-xzv94c e108hv3e5","footer pt-lg-9 pb-lg-10 pb-8 pt-7","faq-area bg-cool rounded-0 pt-8 pb-7 ","related-blog-post related-blog-post--bottom-pattern position-relative overflow-hidden z-1 ps-3 px-sm-0 py-5 py-lg-7 bg-cool","training-container","section-content","row banner "]}):
+    for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container","nav-red", "nav-label","row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0","css-xzv94c e108hv3e5","footer pt-lg-9 pb-lg-10 pb-8 pt-7","faq-area bg-cool rounded-0 pt-8 pb-7 ","related-blog-post related-blog-post--bottom-pattern position-relative overflow-hidden z-1 ps-3 px-sm-0 py-5 py-lg-7 bg-cool","training-container","section-content","row banner ","footer pt-lg-9 pb-lg-10 pb-8 pt-7","contact-form position-relative generic-form gravity-form py-6 dark__form"]}):
         element.decompose()
+    return soup
 
 def check_existing_links(full_soup, keyword):
+    """Check if exact keyword match exists in any anchor text on the page"""
     cleaned_keyword = clean_text(keyword)
     keyword_terms = cleaned_keyword.split()
     
@@ -38,7 +39,8 @@ def check_existing_links(full_soup, keyword):
         return False
 
     escaped_terms = [re.escape(term) for term in keyword_terms]
-    pattern = r'(?<!\S)' + r'\s+'.join(escaped_terms) + r'(?!\S)' 
+    # Strict pattern matching with word boundaries
+    pattern = r'(?<!\S)' + r'\s+'.join(escaped_terms) + r'(?!\S)'
 
     for a_tag in full_soup.find_all('a'):
         link_text = a_tag.get_text(strip=True)
@@ -60,12 +62,11 @@ def find_unlinked_keywords(soup, keyword, target_url):
         return []
 
     escaped_terms = [re.escape(term) for term in keyword_terms]
-    pattern = r'\b' + r'\s+'.join(escaped_terms) + r'\b'
+    pattern = r'(?<!\S)' + r'\s+'.join(escaped_terms) + r'(?!\S)'
     unlinked_occurrences = []
     text_elements = soup.find_all(text=True)
     
     for element in text_elements:
-        # Skip elements that are inside links or empty
         if not element.strip() or element.find_parents('a'):
             continue
         
@@ -91,7 +92,7 @@ def standardize_url(url):
 
 def process_url(url, keyword, target_url):
     url = standardize_url(url)
-    if url.strip().rstrip('/') == target_url.strip().rstrip('/'):
+    if url.strip().rstrip('/').lower() == target_url.strip().rstrip('/').lower():
         return None
     try:
         headers = {
