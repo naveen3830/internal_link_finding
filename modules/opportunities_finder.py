@@ -23,7 +23,7 @@ def clean_text(text):
 
 def extract_text_from_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
-    # Remove unwanted tags
+
     for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 
                                     'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
         element.decompose()
