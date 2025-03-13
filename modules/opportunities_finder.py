@@ -15,22 +15,36 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def clean_text(text):
+    """Enhanced text cleaning with punctuation removal"""
     if not text:
         return ""
     text = re.sub(r'<[^>]+>', ' ', text)
-    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[^\w\s]', ' ', text)  
+    text = re.sub(r'\s+', ' ', text)       
     return text.lower().strip()
 
 def extract_text_from_html(html_content):
+    """Parse HTML while removing navigation and other noisy elements"""
     soup = BeautifulSoup(html_content, 'html.parser')
-
-    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 
-                                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+    for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link',
+                                'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'ul', 'strong']):
         element.decompose()
-    for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container","nav-red", "nav-label","row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0","css-xzv94c e108hv3e5","footer pt-lg-9 pb-lg-10 pb-8 pt-7","faq-area bg-cool rounded-0 pt-8 pb-7 ","related-blog-post related-blog-post--bottom-pattern position-relative overflow-hidden z-1 ps-3 px-sm-0 py-5 py-lg-7 bg-cool","training-container","section-content","row banner "]}):
+    classes_to_remove = [
+        "position-relative mt-5 related-blog-post__swiper-container",
+        "nav-red", "nav-label",
+        "row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0",
+        "css-xzv94c e108hv3e5", "footer pt-lg-9 pb-lg-10 pb-8 pt-7",
+        "faq-area bg-cool rounded-0 pt-8 pb-7 ",
+        "related-blog-post related-blog-post--bottom-pattern position-relative overflow-hidden z-1 ps-3 px-sm-0 py-5 py-lg-7 bg-cool",
+        "training-container", "section-content", "row banner ",
+        "contact-form position-relative generic-form gravity-form py-6 dark__form"
+    ]
+    for element in soup.find_all(class_=classes_to_remove):
         element.decompose()
+    return soup
 
 def check_existing_links(full_soup, keyword):
+    """Check if keyword exists in any anchor text (whole word match)"""
     cleaned_keyword = clean_text(keyword)
     keyword_terms = cleaned_keyword.split()
     
@@ -38,7 +52,7 @@ def check_existing_links(full_soup, keyword):
         return False
 
     escaped_terms = [re.escape(term) for term in keyword_terms]
-    pattern = r'(?<!\S)' + r'\s+'.join(escaped_terms) + r'(?!\S)' 
+    pattern = r'\b' + r'\s+'.join(escaped_terms) + r'\b'
 
     for a_tag in full_soup.find_all('a'):
         link_text = a_tag.get_text(strip=True)
@@ -46,12 +60,13 @@ def check_existing_links(full_soup, keyword):
             continue
             
         cleaned_link_text = clean_text(link_text)
-        if re.fullmatch(pattern, cleaned_link_text):
+        if re.search(pattern, cleaned_link_text):
             return True
             
     return False
 
 def find_unlinked_keywords(soup, keyword, target_url):
+    """Find unlinked keyword occurrences in cleaned content"""
     keyword = keyword.strip()
     cleaned_keyword = clean_text(keyword)
     keyword_terms = cleaned_keyword.split()
@@ -62,19 +77,16 @@ def find_unlinked_keywords(soup, keyword, target_url):
     escaped_terms = [re.escape(term) for term in keyword_terms]
     pattern = r'\b' + r'\s+'.join(escaped_terms) + r'\b'
     unlinked_occurrences = []
-    text_elements = soup.find_all(text=True)
     
-    for element in text_elements:
-        # Skip elements that are inside links or empty
-        if not element.strip() or element.find_parents('a'):
+    for element in soup.find_all(text=True):
+        if element.find_parents('a') or not element.strip():
             continue
         
         original_text = element.strip()
         sentences = re.split(r'(?<=[.!?])\s+', original_text)
         for sentence in sentences:
             cleaned_sentence = clean_text(sentence)
-            matches = re.findall(pattern, cleaned_sentence)
-            if matches:
+            if re.search(pattern, cleaned_sentence):
                 unlinked_occurrences.append({
                     'context': sentence.strip(),
                     'keyword': keyword,
@@ -84,32 +96,37 @@ def find_unlinked_keywords(soup, keyword, target_url):
     return unlinked_occurrences
 
 def standardize_url(url):
+    """Normalize URL format"""
     url = url.strip()
     if url.startswith("www."):
         url = "https://" + url
     return url
 
 def process_url(url, keyword, target_url):
+    """Process URL with enhanced validation and filtering"""
     url = standardize_url(url)
-    if url.strip().rstrip('/') == target_url.strip().rstrip('/'):
+    target_url = standardize_url(target_url)
+    
+    if url.rstrip('/').lower() == target_url.rstrip('/').lower():
         return None
+
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         }
-        response = requests.get(url, headers=headers, timeout=10, verify=False)
+        response = requests.get(url, headers=headers, timeout=15, verify=False)
         response.raise_for_status()
-        
-        # First parse complete HTML for link checking
+
+        # First check with full HTML
         full_soup = BeautifulSoup(response.text, 'html.parser')
         if check_existing_links(full_soup, keyword):
-            logger.info(f"Excluding {url} - keyword already linked somewhere")
+            logger.info(f"Excluding {url} - existing link found for '{keyword}'")
             return None
-            
-        # Then parse cleaned HTML for content analysis
-        cleaned_soup = extract_text_from_html(response.text)
-        unlinked_matches = find_unlinked_keywords(cleaned_soup, keyword, target_url)
+
+        # Then analyze cleaned content
+        clean_soup = extract_text_from_html(response.text)
+        unlinked_matches = find_unlinked_keywords(clean_soup, keyword, target_url)
         
         return {'url': url, 'unlinked_matches': unlinked_matches} if unlinked_matches else None
 
