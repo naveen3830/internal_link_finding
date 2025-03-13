@@ -7,6 +7,7 @@ import time
 import logging
 from urllib3.exceptions import InsecureRequestWarning
 import re
+import requests.compat
 
 # Disable warnings
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
@@ -26,10 +27,30 @@ def extract_text_from_html(html_content):
     for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link', 
                                     'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
         element.decompose()
-    for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container","nav-red", "nav-label","row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0","css-xzv94c e108hv3e5"]}):
+    for element in soup.find_all(attrs={"class": ["position-relative mt-5 related-blog-post__swiper-container","nav-red", "nav-label","row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0","css-xzv94c e108hv3e5","footer pt-lg-9 pb-lg-10 pb-8 pt-7","faq-area bg-cool rounded-0 pt-8 pb-7 ","related-blog-post related-blog-post--bottom-pattern position-relative overflow-hidden z-1 ps-3 px-sm-0 py-5 py-lg-7 bg-cool","training-container","section-content","row banner "]}):
         element.decompose()
-    return soup
+
+def check_existing_links(full_soup, keyword):
+    cleaned_keyword = clean_text(keyword)
+    keyword_terms = cleaned_keyword.split()
     
+    if not keyword_terms:
+        return False
+
+    escaped_terms = [re.escape(term) for term in keyword_terms]
+    pattern = r'(?<!\S)' + r'\s+'.join(escaped_terms) + r'(?!\S)' 
+
+    for a_tag in full_soup.find_all('a'):
+        link_text = a_tag.get_text(strip=True)
+        if not link_text:
+            continue
+            
+        cleaned_link_text = clean_text(link_text)
+        if re.fullmatch(pattern, cleaned_link_text):
+            return True
+            
+    return False
+
 def find_unlinked_keywords(soup, keyword, target_url):
     keyword = keyword.strip()
     cleaned_keyword = clean_text(keyword)
@@ -44,6 +65,7 @@ def find_unlinked_keywords(soup, keyword, target_url):
     text_elements = soup.find_all(text=True)
     
     for element in text_elements:
+        # Skip elements that are inside links or empty
         if not element.strip() or element.find_parents('a'):
             continue
         
@@ -73,24 +95,24 @@ def process_url(url, keyword, target_url):
         return None
     try:
         headers = {
-            'User-Agent': (
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                'AppleWebKit/537.36 (KHTML, like Gecko) '
-                'Chrome/91.0.4472.124 Safari/537.36'
-            ),
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
         }
         response = requests.get(url, headers=headers, timeout=10, verify=False)
         response.raise_for_status()
-        soup = extract_text_from_html(response.text)
-        unlinked_matches = find_unlinked_keywords(soup, keyword, target_url)
-        if unlinked_matches:
-            return {
-                'url': url,
-                'unlinked_matches': unlinked_matches
-            }
-        return None
+        
+        # First parse complete HTML for link checking
+        full_soup = BeautifulSoup(response.text, 'html.parser')
+        if check_existing_links(full_soup, keyword):
+            logger.info(f"Excluding {url} - keyword already linked somewhere")
+            return None
+            
+        # Then parse cleaned HTML for content analysis
+        cleaned_soup = extract_text_from_html(response.text)
+        unlinked_matches = find_unlinked_keywords(cleaned_soup, keyword, target_url)
+        
+        return {'url': url, 'unlinked_matches': unlinked_matches} if unlinked_matches else None
+
     except Exception as e:
         logger.error(f"Error processing {url}: {str(e)}")
         return None
