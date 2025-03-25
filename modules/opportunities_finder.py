@@ -40,7 +40,7 @@ def extract_text_from_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     # Remove navigation and other noisy elements
     for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link',
-                                'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'ul', 'strong']):
+                                'h1', 'h2', 'h3', 'h4', 'h5', 'h6','strong','a']):
         element.decompose()
     classes_to_remove = [
         "position-relative mt-5 related-blog-post__swiper-container",
@@ -82,9 +82,8 @@ def check_existing_links(full_soup, keyword, source_url, target_url):
             if standardized_href == standardized_target:
                 return True
     return False
-
 def find_unlinked_keywords(soup, keyword, target_url):
-    """Find unlinked keyword occurrences in cleaned content, excluding first 50 words and forbidden prefixes"""
+    """Find unlinked keyword occurrences in cleaned content, excluding first 50 words and forbidden suffixes"""
     keyword = keyword.strip()
     cleaned_keyword = clean_text(keyword)
     keyword_terms = cleaned_keyword.split()
@@ -92,7 +91,7 @@ def find_unlinked_keywords(soup, keyword, target_url):
     if not keyword_terms:
         return []
 
-    forbidden_terms = ["solution", "service", "software", "app", "platforms"]
+    forbidden_terms = ["solution", "service", "software", "app", "platforms","solutions", "services", "softwares", "apps", "platform"]
     keyword_lower = keyword.lower()
     ends_with_forbidden = any(keyword_lower.endswith(term) for term in forbidden_terms)
     
@@ -125,8 +124,7 @@ def find_unlinked_keywords(soup, keyword, target_url):
             relevant_part = ' '.join(sentence_words[-words_to_include:])
         else:
             relevant_part = cleaned_sentence
-        
-        # Check for keyword matches
+
         if re.search(pattern, relevant_part):
             if ends_with_forbidden:
                 unlinked_occurrences.append({
@@ -135,7 +133,7 @@ def find_unlinked_keywords(soup, keyword, target_url):
                     'target_url': target_url
                 })
             else:
-                forbidden_pattern = r'\b(' + '|'.join(forbidden_terms) + r')\s+' + pattern
+                forbidden_pattern = pattern + r'\s+(' + '|'.join(forbidden_terms) + r')\b'
                 if not re.search(forbidden_pattern, relevant_part):
                     unlinked_occurrences.append({
                         'context': sentence.strip(),
@@ -144,6 +142,7 @@ def find_unlinked_keywords(soup, keyword, target_url):
                     })
     
     return unlinked_occurrences
+
 
 def process_url(url, keyword, target_url):
     url = standardize_url(url)
