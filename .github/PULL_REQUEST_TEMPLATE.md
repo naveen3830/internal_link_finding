@@ -24,7 +24,6 @@ If you have not followed and completed any of the above, please explain why belo
 ...
 
 ## Definition of Done - Please check off
-
 - [ ] My code is well tested and I have confidence my code works as I expect in a variety of situations.
 - [ ] I have lint and format code is enabled when the file is saved and I have fixed all errors highlighted by lint.
 - [ ] I have deleted all non-descriptive comments and dead code from the files I've touched.

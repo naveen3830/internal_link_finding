@@ -82,7 +82,6 @@ def check_existing_links(full_soup, keyword, source_url, target_url):
             if standardized_href == standardized_target:
                 return True
     return False
-
 def find_unlinked_keywords(soup, keyword, target_url):
     """Find unlinked keyword occurrences in cleaned content, excluding first 50 words and forbidden suffixes"""
     keyword = keyword.strip()
@@ -125,7 +124,7 @@ def find_unlinked_keywords(soup, keyword, target_url):
             relevant_part = ' '.join(sentence_words[-words_to_include:])
         else:
             relevant_part = cleaned_sentence
-        
+
         if re.search(pattern, relevant_part):
             if ends_with_forbidden:
                 unlinked_occurrences.append({
@@ -143,6 +142,7 @@ def find_unlinked_keywords(soup, keyword, target_url):
                     })
     
     return unlinked_occurrences
+
 
 def process_url(url, keyword, target_url):
     url = standardize_url(url)
