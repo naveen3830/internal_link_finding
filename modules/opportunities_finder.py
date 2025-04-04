@@ -40,7 +40,7 @@ def extract_text_from_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     # Remove navigation and other noisy elements
     for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link',
-                                'h1', 'h2', 'h3', 'h4', 'h5', 'h6','strong','a']):
+                                'h1', 'h2', 'h3', 'h4', 'h5', 'h6','strong']):
         element.decompose()
     classes_to_remove = [
         "position-relative mt-5 related-blog-post__swiper-container",

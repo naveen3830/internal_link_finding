@@ -198,7 +198,7 @@ def detect_url_language(url):
         'ko': [r'/ko/', r'/ko-', r'/korean/', r'/kr/'],
         'ar': [r'/ar/', r'/ar-', r'/arabic/', r'/sa/', r'/ae/'],
         # Categories 
-        'blogs': [r'/blogs/', r'/blogs-', r'/en/blogs/', r'/blog/'],
+        'blogs': [r'/blogs/', r'/blogs-', r'/en/blogs/', r'/blog/',r'/insights/'],
         'corporate': [r'/corporate/', r'/corporate-', r'/en/corporate/', r'/corp/'],
         'how-to': [r'/how-to/', r'/how-to-', r'/en/how-to/', r'/howto/'],
         'products': [r'/products/', r'/products-'],
