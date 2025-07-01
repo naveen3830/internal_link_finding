@@ -38,7 +38,6 @@ def standardize_url(url):
 
 def extract_text_from_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
-    # Remove navigation and other noisy elements
     for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link',
                                 'h1', 'h2', 'h3', 'h4', 'h5', 'h6','strong']):
         element.decompose()
@@ -46,9 +45,8 @@ def extract_text_from_html(html_content):
         "position-relative mt-5 related-blog-post__swiper-container",
         "nav-red", "nav-label",
         "row left-zero__without-shape position-relative z-1 mt-4 mt-md-5 px-0","footer pt-lg-9 pb-lg-10 pb-8 pt-7",
-        "related-blog-post related-blog-post--bottom-pattern position-relative overflow-hidden z-1 ps-3 px-sm-0 py-5 py-lg-7 bg-cool","footer pt-lg-9 pb-lg-10 pb-8 pt-7",
-        "section-content", "row banner ",
-        "contact-form position-relative generic-form gravity-form py-6 dark__form", 
+        "related-blog-post related-blog-post--bottom-pattern position-relative overflow-hidden z-1 ps-3 px-sm-0 py-5 py-lg-7 bg-cool","section-content", "row banner ",
+        "contact-form position-relative generic-form gravity-form py-6 dark__form",
         #"training-container","css-xzv94c e108hv3e5", "faq-area bg-white rounded-0 pb-3 pb-lg-4"
     ]
     for element in soup.find_all(class_=classes_to_remove):
@@ -56,7 +54,6 @@ def extract_text_from_html(html_content):
     return soup
 
 def check_existing_links(full_soup, keyword, source_url, target_url):
-    """Check if keyword exists in any anchor text linking to the target URL"""
     cleaned_keyword = clean_text(keyword)
     keyword_terms = cleaned_keyword.split()
     
@@ -152,8 +149,8 @@ def process_url(url, keyword, target_url):
         return None
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'User-Agent': ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+            )
         }
         response = requests.get(url, headers=headers, timeout=15, verify=False)
         response.raise_for_status()

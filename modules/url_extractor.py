@@ -178,9 +178,10 @@ def detect_url_language(url):
     }
 
     language_patterns = {
+        'en-uk':[r'/uk/',r'/uk-',r'/uk'],
         'en': [r'/en/', r'/en-', r'/english/', r'/us/', r'/uk/', r'/au/', r'/international/'],
         'it': [r'/it/', r'/it-', r'/italiano/', r'/italian/', r'/ch/'],
-        'es': [r'/es/', r'/es-', r'/espanol/', r'/spanish/', r'/mx/', r'/cl/', r'/co/', r'/latam/'],
+        'es': [r'/es/', r'/es-', r'/espanol/', r'/spanish/', r'/mx/', r'/cl/', r'/co/', r'/latam/',r'lat',r'/lat/'],
         'fr': [r'/fr/', r'/fr-', r'/french/', r'/ca/', r'/ch/', r'/be/'],
         'de': [r'/de/', r'/de-', r'/deutsch/', r'/german/', r'/at/', r'/ch/'],
         'pt': [r'/pt/', r'/pt-', r'/portuguese/', r'/br/', r'/pt/', r'/ao/'],
@@ -247,7 +248,7 @@ def detect_url_language(url):
     return 'en'
 
 def fetch_sitemap_urls(website_url):
-    sitemap_paths = ["/sitemap.xml", "/sitemap_index.xml", "/sitemap-1.xml", "/sitemaps/sitemap.xml", "/sitemaps/sitemap_index.xml"]
+    sitemap_paths = ["/sitemap.xml","/sitemap-index.xml", "/sitemap_index.xml", "/sitemap-1.xml", "/sitemaps/sitemap.xml", "/sitemaps/sitemap_index.xml,"]
     base_url = website_url.rstrip('/')
     all_urls = []
 
