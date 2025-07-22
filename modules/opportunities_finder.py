@@ -10,12 +10,9 @@ import re
 import requests.compat
 from collections import defaultdict
 
-# --- Setup ---
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# --- Core Helper Functions (Optimized) ---
 
 def clean_text(text):
     if not text:
@@ -40,7 +37,6 @@ def standardize_url(url):
     return standardized
 
 def extract_text_from_html(html_content):
-    # Using 'lxml' is generally faster than 'html.parser'
     soup = BeautifulSoup(html_content, 'lxml')
     for element in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'meta', 'link',
                                 'h1', 'h2', 'h3', 'h4', 'h5', 'h6','strong','a']):
