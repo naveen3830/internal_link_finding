@@ -323,7 +323,6 @@ def file_upload_internal_linking():
     if 'completed_processing_file' not in st.session_state:
         st.session_state.completed_processing_file = False
     
-    # UI logic... (no changes here)
     df_urls, df_keywords = None, None
     if 'filtered_df' in st.session_state and st.session_state.filtered_df is not None:
         st.success("Using filtered data from a previous module.")
@@ -368,9 +367,8 @@ def file_upload_internal_linking():
     max_workers = st.slider("Concurrent searches", min_value=1, max_value=20, value=15,
         help="Number of URLs to process simultaneously", key="slider_file")
     
-    # --- UPDATED: The button logic now passes the 'nlp' model ---
     if st.button("Process URLs", key="process_files"):
-        if nlp is None: # Check if the model loaded correctly
+        if nlp is None:
             st.error("spaCy model could not be loaded. Please check the console for errors and follow the setup instructions.")
             return
 
@@ -394,12 +392,11 @@ def file_upload_internal_linking():
             results = []
             with requests.Session() as session:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    # Pass the nlp object to the thread worker
+                    
                     future_to_url = {
                         executor.submit(process_single_url_for_all_keywords, url, keyword_url_pairs, session, nlp): url
                         for url in urls_to_process
                     }
-                    # ... (rest of the processing logic is the same)
                     total_tasks = len(future_to_url)
                     for future in concurrent.futures.as_completed(future_to_url):
                         processed += 1
@@ -417,7 +414,6 @@ def file_upload_internal_linking():
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
-    # Display logic... (no changes here)
     if st.session_state.completed_processing_file:
         results = st.session_state.search_results_file
         if results:
