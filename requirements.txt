@@ -18,3 +18,4 @@ langchain
 langchain-groq
 pdfkit
 platformdirs
+spacy
