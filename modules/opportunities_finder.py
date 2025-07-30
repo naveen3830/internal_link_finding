@@ -10,6 +10,7 @@ import re
 import requests.compat
 from collections import defaultdict
 import spacy 
+import numpy as np
 
 @st.cache_resource
 def load_spacy_model():
